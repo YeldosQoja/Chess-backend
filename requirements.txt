@@ -1,0 +1,10 @@
+Django
+channels[daphne]
+channels-redis
+django-cors-headers
+django-debug-toolbar
+djangorestframework
+djangorestframework-simplejwt
+psycopg[binary]
+selenium
+python-dotenv
