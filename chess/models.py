@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.utils import timezone
 
+# Create your models here.
 class UserManager(BaseUserManager):
     def create_user(self, email, username, password, **extra_fields):
         if not email:
@@ -20,7 +21,7 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-# Create your models here.
+
 class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     username = models.CharField(max_length=100, unique=True)
@@ -42,3 +43,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_staff(self):
         return self.is_admin
+
+
+class Game(models.Model):
+    challenger = models.ForeignKey(User, on_delete=models.CASCADE)
+    accepted_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    winner = models.ForeignKey(User, on_delete=models.CASCADE, default=None)
+    winning_type = models.SmallIntegerField(default=None)
