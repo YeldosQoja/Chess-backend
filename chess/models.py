@@ -46,7 +46,15 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Game(models.Model):
-    challenger = models.ForeignKey(User, on_delete=models.CASCADE)
-    accepted_by = models.ForeignKey(User, on_delete=models.CASCADE)
-    winner = models.ForeignKey(User, on_delete=models.CASCADE, default=None)
-    winning_type = models.SmallIntegerField(default=None)
+    challenger = models.ForeignKey(User, on_delete=models.CASCADE, related_name="challenger")
+    opponent = models.ForeignKey(User, on_delete=models.CASCADE, related_name="opponent")
+    winner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+    winning_type = models.SmallIntegerField(null=True)
+    is_draw = models.BooleanField(null=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    started_at = models.DateTimeField(null=True)
+
+
+class UserChannel(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
