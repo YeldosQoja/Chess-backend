@@ -103,21 +103,24 @@ def add_friend(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def accept_friend_request(request):
+def accept_friend(request):
     user = request.user
     friend_id = request.data["friend"]
     friend = get_object_or_404(User, pk=friend_id)
     try:
         friend_request = FriendRequest.objects.get(sender=friend, receiver=user)
         friend_request.accept()
-        return Response(status=status.HTTP_201_CREATED)
+        return Response(
+            {"message": f"You and {friend.username} have become friends."},
+            status=status.HTTP_201_CREATED,
+        )
     except:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def decline_friend_request(request):
+def decline_friend(request):
     user = request.user
     friend_id = request.data["friend"]
     friend = get_object_or_404(User, pk=friend_id)
@@ -131,9 +134,9 @@ def decline_friend_request(request):
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def break_friendship(request):
+def remove_friend(request):
     user = request.user
     friend = request.data["friend"]
-    friendship = get_object_or_404(Friendship, user1=user, user2=friend)
+    friendship = get_object_or_404(Friendship, user=user, friend=friend)
     friendship.break_friendship()
     return Response({"message": "Friendship is broken!"}, status=status.HTTP_200_OK)

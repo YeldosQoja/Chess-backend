@@ -16,10 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from chess.views import user_signin
+from chess.views import user_signin, CreateUserView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api-auth/', include('rest_framework.urls')),
-    path('api/signin/', user_signin, name="signin"),
+    path('api/auth/signin/', user_signin, name="signin"),
+    path('api/auth/signup/', CreateUserView.as_view(), name="signup"),
+    path("api/chess/", include('chess.urls')),
 ]
