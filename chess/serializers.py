@@ -1,14 +1,21 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import FriendRequest
+from .models import Profile, FriendRequest
 
 User = get_user_model()
 
 
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ["user", "avatar", "games", "wins", "losses", "draws"]
+
+
 class UserSerializer(serializers.ModelSerializer):
+    profile = ProfileSerializer(required=False)
     class Meta:
         model = User
-        fields = ["id", "email", "username", "first_name", "last_name", "password"]
+        fields = ["id", "email", "username", "first_name", "last_name", "friends", "password", "profile"]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):

@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.contrib.auth.models import (
     AbstractBaseUser,
     PermissionsMixin,
@@ -18,6 +19,10 @@ class UserManager(BaseUserManager):
         user = self.model(email=email, username=username, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+
+        profile = Profile(user=user)
+        profile.save(using=self._db)
+
         return user
 
     def create_superuser(self, email, username, password, **extra_fields):
@@ -50,6 +55,26 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def is_staff(self):
         return self.is_admin
+
+
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    avatar = models.URLField(null=True)
+
+    def games(self):
+        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user))
+
+    def wins(self):
+        user_games = self.games()
+        return user_games.filter(winner=self.user.pk).count()
+
+    def losses(self):
+        user_games = self.games()
+        return user_games.exclude(winner=self.user.pk).count()
+
+    def draws(self):
+        user_games = self.games()
+        return user_games.filter(winner=None).count()
 
 
 class Friendship(models.Model):
@@ -93,12 +118,14 @@ class FriendRequest(models.Model):
         self.sender.friends.add(self.receiver)
         self.receiver.friends.add(self.sender)
         self.is_active = False
+        self.save()
 
     def decline(self):
         """
         When receiver declines a request.
         """
         self.is_active = False
+        self.save()
 
 
 class Game(models.Model):
@@ -108,15 +135,17 @@ class Game(models.Model):
     opponent = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="opponent"
     )
-    winner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        null=True,
-        related_name="winner",
-    )
+    winner = models.IntegerField(null=True, default=None)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     started_at = models.DateTimeField(null=True)
+    finished_at = models.DateField(null=True)
+
+    def finish(self, winner=None):
+        self.is_active = False
+        self.finished_at = timezone.now()
+        self.winner = winner
+        self.save()
 
 
 class GameRequest(models.Model):
@@ -127,7 +156,7 @@ class GameRequest(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="game_receiver"
     )
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(default=timezone.now)  
+    created_at = models.DateTimeField(default=timezone.now)
 
 
 class UserChannel(models.Model):

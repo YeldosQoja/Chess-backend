@@ -61,13 +61,19 @@ class CreateUserView(generics.CreateAPIView):
     authentication_classes = []
 
 
-class ProfileUserRetrieveView(generics.RetrieveAPIView):
+class UserDetailView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
 
-    def get(self, request, *args, **kwargs):
-        serializer = UserSerializer(request.user)
-        return Response(serializer.data)
+
+class ProfileView(generics.RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = User.objects.all()
+
+    def get_object(self):
+        return self.request.user
 
 
 class FriendListView(generics.ListAPIView):
