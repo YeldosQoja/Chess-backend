@@ -53,8 +53,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Friendship(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="user")
-    friend = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="friend")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="user"
+    )
+    friend = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="friend"
+    )
 
     def break_friendship(self):
         """
@@ -68,7 +72,9 @@ class Friendship(models.Model):
 
 
 class FriendRequest(models.Model):
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sender")
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sender"
+    )
     receiver = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="receiver"
     )
@@ -102,11 +108,26 @@ class Game(models.Model):
     opponent = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="opponent"
     )
-    winner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True)
-    winning_type = models.SmallIntegerField(null=True)
-    is_draw = models.BooleanField(null=True)
+    winner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="winner",
+    )
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     started_at = models.DateTimeField(null=True)
+
+
+class GameRequest(models.Model):
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="game_sender"
+    )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="game_receiver"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now)  
 
 
 class UserChannel(models.Model):

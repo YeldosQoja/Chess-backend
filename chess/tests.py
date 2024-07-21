@@ -1,8 +1,20 @@
 from django.test import TestCase, RequestFactory
 from .views import user_signin, CreateUserView
-from .models import User, Friendship, FriendRequest
+from .models import User, Friendship, FriendRequest, UserChannel
 from rest_framework.test import APIClient
 from django.urls import reverse
+from channels.testing import WebsocketCommunicator
+from .consumers import MainConsumer
+from core.asgi import application
+
+class AuthWebsocketCommunicator(WebsocketCommunicator):
+    def __init__(self, application, path, headers=None, subprotocols=None, user=None):
+        super(AuthWebsocketCommunicator, self).__init__(
+            application, path, headers, subprotocols
+        )
+        if user is not None:
+            self.scope["user"] = user
+
 
 class AuthViewTests(TestCase):
     def setUp(self):
@@ -98,7 +110,7 @@ class FriendRequestModelTests(TestCase):
         self.assertNotIn(self.user, friend_friends)
 
 
-class FriendSystemAPITests(TestCase):
+class FriendSystemAPIViewsTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email="test@test.com", username="test", password="12345"
@@ -111,7 +123,9 @@ class FriendSystemAPITests(TestCase):
     def test_add_friend(self):
         # Request that creates a friend request from self.user to self.friend
         self.api_client.force_authenticate(user=self.user)
-        response = self.api_client.post(reverse("friend-add"), {"friend": self.friend.pk})
+        response = self.api_client.post(
+            reverse("friend-add"), {"friend": self.friend.pk}
+        )
         # Check if request is successful
         self.assertEqual(response.status_code, 201)
         # Get a list of friend's incoming requests
@@ -120,35 +134,73 @@ class FriendSystemAPITests(TestCase):
         # Check if friend's incoming request list includes the request from self.user
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.user.pk, response.data[0]["sender"])
-    
+
     def test_accept_friend(self):
         # Request that creates a friend request from self.user to self.friend
         self.api_client.force_authenticate(user=self.user)
         self.api_client.post(reverse("friend-add"), {"friend": self.friend.pk})
         # self.friend accepts a friend request from self.user
         self.api_client.force_authenticate(user=self.friend)
-        response = self.api_client.post(reverse("friend-accept"), {"friend": self.user.pk})
+        response = self.api_client.post(
+            reverse("friend-accept"), {"friend": self.user.pk}
+        )
         # Check if they include each other in their friend list
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data, { "message": f"You and {self.user.username} have become friends." })
-    
+        self.assertEqual(
+            response.data,
+            {"message": f"You and {self.user.username} have become friends."},
+        )
+
     def test_decline_friend(self):
         # Request that creates a friend request from self.user to self.friend
         self.api_client.force_authenticate(user=self.user)
         self.api_client.post(reverse("friend-add"), {"friend": self.friend.pk})
         # self.friend declines a friend request from self.user
         self.api_client.force_authenticate(user=self.friend)
-        response = self.api_client.post(reverse("friend-decline"), {"friend": self.user.pk})
+        response = self.api_client.post(
+            reverse("friend-decline"), {"friend": self.user.pk}
+        )
         # Check if they include each other in their friend list
         self.assertEqual(response.status_code, 200)
-    
+
     def test_remove_friend(self):
         self.user.friends.add(self.friend)
         self.friend.friends.add(self.user)
         # self.user breaks a friendship with self.friend
         self.api_client.force_authenticate(user=self.user)
-        response = self.api_client.delete(reverse("friend-remove"), {"friend": self.friend.pk})
+        response = self.api_client.delete(
+            reverse("friend-remove"), {"friend": self.friend.pk}
+        )
         # Check if they are no longer friends
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(self.user, self.friend.friends.all())
         self.assertNotIn(self.friend, self.user.friends.all())
+
+
+class GameAPIViewsTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="test@test.com", username="test", password="12345"
+        )
+        self.friend = User.objects.create_user(
+            email="friend@test.com", username="friend", password="12345"
+        )
+        UserChannel.objects.create(name=self.user.username, user=self.user)
+        UserChannel.objects.create(name=self.friend.username, user=self.friend)
+        self.user.friends.add(self.friend)
+        self.friend.friends.add(self.user)
+        self.api_client = APIClient()
+        logged_in = self.api_client.login(email=self.user.email, password="12345")
+
+    async def test_on_challenge_event(self):
+        communicator = WebsocketCommunicator(MainConsumer.as_asgi(), "/")
+        communicator.scope["user"] = self.user
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        response = self.api_client.post(
+            reverse("challenge"), {"opponent": self.friend.pk}
+        )
+        await communicator.send_to(text_data="Hello")
+        response = await communicator.receive_from()
+        print(response)
+        await communicator.disconnect()

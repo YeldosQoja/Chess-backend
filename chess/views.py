@@ -10,8 +10,10 @@ from rest_framework.decorators import (
     authentication_classes,
 )
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import User, Friendship, FriendRequest
+from .models import User, Friendship, FriendRequest, Game, GameRequest, UserChannel
 from django.shortcuts import get_object_or_404
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 
 # Create your views here.
@@ -140,3 +142,52 @@ def remove_friend(request):
     friendship = get_object_or_404(Friendship, user=user, friend=friend)
     friendship.break_friendship()
     return Response({"message": "Friendship is broken!"}, status=status.HTTP_200_OK)
+
+
+channel_layer = get_channel_layer()
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def send_challenge(request):
+    user = request.user
+    friend_id = request.data["opponent"]
+    friend = get_object_or_404(User, pk=friend_id)
+    # If they are not friend return response with error
+    if friend not in user.friends.all() or user not in friend.friends.all():
+        return Response(
+            {"error": f"I'm sorry, but {friend.username} is not your friend."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    game_request = GameRequest.objects.create(sender=user, receiver=friend)
+    # If friend is currently online send message to friend's channel
+    friend_socket_channel = UserChannel.objects.filter(user=friend)
+    if friend_socket_channel.exists():
+        async_to_sync(channel_layer.send)(
+            friend_socket_channel.first().name,
+            {"type": "on.challenge", "request_id": game_request.pk},
+        )
+    return Response(status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def accept_challenge(request):
+    user = request.user
+    game_request_id = request.data["request"]
+    game_request = get_object_or_404(GameRequest, pk=game_request_id)
+    friend = game_request.sender
+    friend_socket_channel = UserChannel.objects.filter(user=friend)
+    # If sender of request is no longer online, we return error response
+    if not friend_socket_channel.exists():
+        return Response(
+            {"error": "Your opponent is not online."}, status=status.HTTP_403_FORBIDDEN
+        )
+    game_request.is_active = False
+    game_request.save()
+    game = Game.objects.create(challenger=game_request.sender, opponent=user)
+    async_to_sync(channel_layer.send)(
+        friend_socket_channel.first().name,
+        {"type": "on.challenge.accept", "game_id": game.pk},
+    )
+    return Response(status=status.HTTP_201_CREATED)
