@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    UserListView,
     UserDetailView,
     ProfileView,
     FriendListView,
@@ -14,6 +15,7 @@ from .views import (
 
 urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("users/", UserListView.as_view(), name="user-list"),
     path("users/<int:pk>", UserDetailView.as_view(), name="user-detail"),
     path("friends/", FriendListView.as_view(), name="friend-list"),
     path("friends/requests/", FriendRequestListView.as_view(), name="friend-request-list"),

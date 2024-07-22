@@ -61,6 +61,20 @@ class CreateUserView(generics.CreateAPIView):
     authentication_classes = []
 
 
+class UserListView(generics.ListAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return User.objects.exclude(pk=self.request.user.pk)
+
+    def get(self, request, *args, **kwargs):
+        username = request.GET.get("username", "")
+        queryset = self.get_queryset().filter(username__icontains=username)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
 class UserDetailView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]

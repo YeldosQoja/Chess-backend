@@ -106,6 +106,30 @@ class ProfileTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+class UserListViewTests(TestCase):
+    def setUp(self):
+        usernames = ["oscar", "john", "alice", "bob", "william"]
+        self.users = []
+        for username in usernames:
+            user = User.objects.create_user(username=username, email=f"{username}@test.com", password="12345")
+            self.users.append(user)
+        self.api_client = APIClient()
+        self.api_client.force_authenticate(user=self.users[0])
+    
+    def test_without_query_params(self):
+        response = self.api_client.get(reverse("user-list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 4)
+        self.assertEqual([user["id"] for user in response.data], [user.pk for user in self.users][1:])
+
+    def test_with_query_params(self):
+        response = self.api_client.get(reverse("user-list"), { "username": "o" })
+        self.assertEqual(response.status_code, 200)
+        data = response.data
+        self.assertEqual(len(data), 2)
+        self.assertEqual([user["username"] for user in data], ["john", "bob"])
+
+
 class FriendshipModelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
