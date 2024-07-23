@@ -1,6 +1,7 @@
 from django.test import TestCase, RequestFactory
 from .views import user_signin, CreateUserView
 from .models import User, Friendship, FriendRequest, UserChannel, Game
+from .serializers import GameSerializer
 from rest_framework.test import APIClient
 from django.urls import reverse
 from channels.testing import WebsocketCommunicator
@@ -74,11 +75,11 @@ class ProfileModelTests(TestCase):
         game2 = Game.objects.create(challenger=self.friend, opponent=self.user)
         game3 = Game.objects.create(challenger=self.user, opponent=self.friend)
         self.games = [game1, game2, game3]
-    
+
     def test_games_count(self):
         user_games = self.user.profile.games()
         self.assertEqual(user_games.count(), 3)
-    
+
     def test_user_wins_count(self):
         self.games[0].finish(winner=self.user.pk)
         self.games[1].finish(winner=self.user.pk)
@@ -91,18 +92,22 @@ class ProfileTests(TestCase):
         self.user = User.objects.create_user(
             email="test@test.com", username="test", password="12345"
         )
+        self.friend = User.objects.create_user(
+            email="friend@test.com", username="friend", password="12345"
+        )
+        self.game = Game.objects.create(challenger=self.user, opponent=self.friend)
         self.api_client = APIClient()
         self.api_client.force_authenticate(user=self.user)
 
     def test_get_user_profile(self):
         response = self.api_client.get(reverse("profile"))
         self.assertEqual(response.status_code, 200)
+        data = response.data
+        serializer = GameSerializer(self.game)
+        self.assertEqual(data["profile"]["games"], [serializer.data])
 
     def test_get_user_profile_by_id(self):
-        user = User.objects.create_user(
-            email="user@test.com", username="user", password="12345"
-        )
-        response = self.api_client.get(reverse("user-detail", args=(user.pk,)))
+        response = self.api_client.get(reverse("user-detail", args=(self.user.pk,)))
         self.assertEqual(response.status_code, 200)
 
 
@@ -111,19 +116,20 @@ class UserListViewTests(TestCase):
         usernames = ["oscar", "john", "alice", "bob", "william"]
         self.users = []
         for username in usernames:
-            user = User.objects.create_user(username=username, email=f"{username}@test.com", password="12345")
+            user = User.objects.create_user(
+                username=username, email=f"{username}@test.com", password="12345"
+            )
             self.users.append(user)
         self.api_client = APIClient()
         self.api_client.force_authenticate(user=self.users[0])
-    
+
     def test_without_query_params(self):
         response = self.api_client.get(reverse("user-list"))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 4)
-        self.assertEqual([user["id"] for user in response.data], [user.pk for user in self.users][1:])
+        self.assertEqual(len(response.data), 0)
 
     def test_with_query_params(self):
-        response = self.api_client.get(reverse("user-list"), { "username": "o" })
+        response = self.api_client.get(reverse("user-list"), {"query": "o"})
         self.assertEqual(response.status_code, 200)
         data = response.data
         self.assertEqual(len(data), 2)

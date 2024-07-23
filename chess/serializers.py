@@ -1,11 +1,19 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Profile, FriendRequest
+from .models import Profile, FriendRequest, Game
+
 
 User = get_user_model()
 
 
+class GameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Game
+        fields = ["id", "challenger", "opponent", "winner", "is_active", "created_at", "started_at", "finished_at"]
+
+
 class ProfileSerializer(serializers.ModelSerializer):
+    games = GameSerializer(many=True)
     class Meta:
         model = Profile
         fields = ["user", "avatar", "games", "wins", "losses", "draws"]
