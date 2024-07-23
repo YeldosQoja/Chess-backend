@@ -23,5 +23,5 @@ urlpatterns = [
     path('api-auth/', include('rest_framework.urls')),
     path('api/auth/signin/', user_signin, name="signin"),
     path('api/auth/signup/', CreateUserView.as_view(), name="signup"),
-    path("api/chess/", include('chess.urls')),
+    path("api/", include('chess.urls')),
 ]

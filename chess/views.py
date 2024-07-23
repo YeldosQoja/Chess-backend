@@ -14,6 +14,7 @@ from .models import User, Friendship, FriendRequest, Game, GameRequest, UserChan
 from django.shortcuts import get_object_or_404
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.db.models import Q
 
 
 # Create your views here.
@@ -69,8 +70,14 @@ class UserListView(generics.ListAPIView):
         return User.objects.exclude(pk=self.request.user.pk)
 
     def get(self, request, *args, **kwargs):
-        username = request.GET.get("username", "")
-        queryset = self.get_queryset().filter(username__icontains=username)
+        query = request.GET.get("query", "")
+        if not query:
+            return Response([])
+        queryset = self.get_queryset().filter(
+            Q(username__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+        )
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
@@ -90,12 +97,25 @@ class ProfileView(generics.RetrieveAPIView):
         return self.request.user
 
 
-class FriendListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+class ProfileFriendList(generics.ListAPIView):
     serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return self.request.user.friends
+
+
+class FriendListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        pk = kwargs["pk"]
+        user = get_object_or_404(queryset, pk=pk)
+        serializer = self.get_serializer(user.friends, many=True)
+        return Response(serializer.data)
 
 
 class FriendRequestListView(generics.ListAPIView):
@@ -169,19 +189,11 @@ channel_layer = get_channel_layer()
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def send_challenge(request):
-    user = request.user
-    friend_id = request.data["opponent"]
-    friend = get_object_or_404(User, pk=friend_id)
-    # If they are not friend return response with error
-    if friend not in user.friends.all() or user not in friend.friends.all():
-        return Response(
-            {"error": f"I'm sorry, but {friend.username} is not your friend."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
-    game_request = GameRequest.objects.create(sender=user, receiver=friend)
+def send_challenge(request, user_id):
+    opponent = get_object_or_404(User, pk=user_id)
+    game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
     # If friend is currently online send message to friend's channel
-    friend_socket_channel = UserChannel.objects.filter(user=friend)
+    friend_socket_channel = UserChannel.objects.filter(user=opponent)
     if friend_socket_channel.exists():
         async_to_sync(channel_layer.send)(
             friend_socket_channel.first().name,
@@ -192,22 +204,20 @@ def send_challenge(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def accept_challenge(request):
-    user = request.user
-    game_request_id = request.data["request"]
-    game_request = get_object_or_404(GameRequest, pk=game_request_id)
-    friend = game_request.sender
-    friend_socket_channel = UserChannel.objects.filter(user=friend)
+def accept_challenge(request, pk):
+    game_request = get_object_or_404(GameRequest, pk=pk)
+    opponent = game_request.sender
+    opponent_socket_channel = UserChannel.objects.filter(user=opponent)
     # If sender of request is no longer online, we return error response
-    if not friend_socket_channel.exists():
+    if not opponent_socket_channel.exists():
         return Response(
             {"error": "Your opponent is not online."}, status=status.HTTP_403_FORBIDDEN
         )
     game_request.is_active = False
     game_request.save()
-    game = Game.objects.create(challenger=game_request.sender, opponent=user)
+    game = Game.objects.create(challenger=opponent, opponent=request.user)
     async_to_sync(channel_layer.send)(
-        friend_socket_channel.first().name,
+        opponent_socket_channel.first().name,
         {"type": "on.challenge.accept", "game_id": game.pk},
     )
     return Response(status=status.HTTP_201_CREATED)
