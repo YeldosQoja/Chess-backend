@@ -100,11 +100,10 @@ class ProfileTests(TestCase):
         self.api_client.force_authenticate(user=self.user)
 
     def test_get_user_profile(self):
-        response = self.api_client.get(reverse("profile"))
+        response = self.api_client.get(reverse("profile-game-list"))
         self.assertEqual(response.status_code, 200)
-        data = response.data
         serializer = GameSerializer(self.game)
-        self.assertEqual(data["profile"]["games"], [serializer.data])
+        self.assertEqual(response.data, [serializer.data])
 
     def test_get_user_profile_by_id(self):
         response = self.api_client.get(reverse("user-detail", args=(self.user.pk,)))

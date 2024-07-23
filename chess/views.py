@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import status, generics
 from rest_framework.exceptions import AuthenticationFailed
-from .serializers import UserSerializer, FriendRequestSerialier
+from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.decorators import (
@@ -97,12 +97,20 @@ class ProfileView(generics.RetrieveAPIView):
         return self.request.user
 
 
-class ProfileFriendList(generics.ListAPIView):
+class ProfileFriendListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         return self.request.user.friends
+
+
+class ProfileGameListView(generics.ListAPIView):
+    serializer_class = GameSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.request.user.profile.games()
 
 
 class FriendListView(generics.ListAPIView):
@@ -221,3 +229,15 @@ def accept_challenge(request, pk):
         {"type": "on.challenge.accept", "game_id": game.pk},
     )
     return Response(status=status.HTTP_201_CREATED)
+
+
+class GameListView(generics.ListAPIView):
+    serializer_class = GameSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Game.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        pk = kwargs["pk"]
+        user = get_object_or_404(User, pk=pk)
+        serializer = self.get_serializer(user.profile.games(), many=True)
+        return Response(serializer.data)

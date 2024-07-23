@@ -6,17 +6,10 @@ from .models import Profile, FriendRequest, Game
 User = get_user_model()
 
 
-class GameSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Game
-        fields = ["id", "challenger", "opponent", "winner", "is_active", "created_at", "started_at", "finished_at"]
-
-
 class ProfileSerializer(serializers.ModelSerializer):
-    games = GameSerializer(many=True)
     class Meta:
         model = Profile
-        fields = ["user", "avatar", "games", "wins", "losses", "draws"]
+        fields = ["user", "avatar", "wins", "losses", "draws"]
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -36,3 +29,11 @@ class FriendRequestSerialier(serializers.ModelSerializer):
         model = FriendRequest
         fields = ["id", "sender", "receiver", "created_at", "is_active"]
         extra_kwargs = {"is_active": {"read_only": True}}
+
+
+class GameSerializer(serializers.ModelSerializer):
+    challenger = UserSerializer()
+    opponent = UserSerializer()
+    class Meta:
+        model = Game
+        fields = ["id", "challenger", "opponent", "winner", "is_active", "created_at", "started_at", "finished_at"]
