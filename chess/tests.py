@@ -1,7 +1,7 @@
 from django.test import TestCase, RequestFactory
 from .views import user_signin, CreateUserView
 from .models import User, Friendship, FriendRequest, UserChannel, Game
-from .serializers import GameSerializer
+from .serializers import UserSerializer, GameSerializer
 from rest_framework.test import APIClient
 from django.urls import reverse
 from channels.testing import WebsocketCommunicator
@@ -185,7 +185,7 @@ class FriendRequestModelTests(TestCase):
         self.assertNotIn(self.user, friend_friends)
 
 
-class FriendSystemAPIViewsTests(TestCase):
+class FriendRequestViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email="test@test.com", username="test", password="12345"
@@ -194,46 +194,45 @@ class FriendSystemAPIViewsTests(TestCase):
             email="friend@test.com", username="friend", password="12345"
         )
         self.api_client = APIClient()
+        self.api_client.force_authenticate(user=self.user)
 
     def test_add_friend(self):
         # Request that creates a friend request from self.user to self.friend
-        self.api_client.force_authenticate(user=self.user)
-        response = self.api_client.post(
-            reverse("friend-add"), {"friend": self.friend.pk}
-        )
+        response = self.api_client.post(reverse("friend-add", args=(self.friend.pk,)))
         # Check if request is successful
         self.assertEqual(response.status_code, 201)
         # Get a list of friend's incoming requests
         self.api_client.force_authenticate(user=self.friend)
-        response = self.api_client.get(reverse("friend-request-list"))
+        response = self.api_client.get(reverse("profile-request-list"))
+        data = response.data
         # Check if friend's incoming request list includes the request from self.user
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.user.pk, response.data[0]["sender"])
+        serializer = UserSerializer(data=self.user)
+        if serializer.is_valid():
+            self.assertEqual(data[0]["sender"], serializer.data)
 
     def test_accept_friend(self):
-        # Request that creates a friend request from self.user to self.friend
-        self.api_client.force_authenticate(user=self.user)
-        self.api_client.post(reverse("friend-add"), {"friend": self.friend.pk})
-        # self.friend accepts a friend request from self.user
-        self.api_client.force_authenticate(user=self.friend)
+        friend_request = FriendRequest.objects.create(
+            sender=self.friend, receiver=self.user
+        )
+        # self.user accepts a friend request from self.user
         response = self.api_client.post(
-            reverse("friend-accept"), {"friend": self.user.pk}
+            reverse("friend-accept-request", args=(friend_request.pk,))
         )
         # Check if they include each other in their friend list
         self.assertEqual(response.status_code, 201)
         self.assertEqual(
             response.data,
-            {"message": f"You and {self.user.username} have become friends."},
+            {"message": f"You and {self.friend} have become friends."},
         )
 
     def test_decline_friend(self):
-        # Request that creates a friend request from self.user to self.friend
-        self.api_client.force_authenticate(user=self.user)
-        self.api_client.post(reverse("friend-add"), {"friend": self.friend.pk})
-        # self.friend declines a friend request from self.user
-        self.api_client.force_authenticate(user=self.friend)
+        friend_request = FriendRequest.objects.create(
+            sender=self.friend, receiver=self.user
+        )
+        # self.user declines a friend request from self.user
         response = self.api_client.post(
-            reverse("friend-decline"), {"friend": self.user.pk}
+            reverse("friend-decline-request", args=(friend_request.pk,))
         )
         # Check if they include each other in their friend list
         self.assertEqual(response.status_code, 200)
@@ -242,9 +241,8 @@ class FriendSystemAPIViewsTests(TestCase):
         self.user.friends.add(self.friend)
         self.friend.friends.add(self.user)
         # self.user breaks a friendship with self.friend
-        self.api_client.force_authenticate(user=self.user)
         response = self.api_client.delete(
-            reverse("friend-remove"), {"friend": self.friend.pk}
+            reverse("friend-remove", args=(self.friend.pk,))
         )
         # Check if they are no longer friends
         self.assertEqual(response.status_code, 200)

@@ -105,6 +105,15 @@ class ProfileFriendListView(generics.ListAPIView):
         return self.request.user.friends
 
 
+class FriendRequestListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = FriendRequestSerialier
+
+    def get_queryset(self):
+        user = self.request.user
+        return FriendRequest.objects.filter(receiver=user, is_active=True)
+
+
 class ProfileGameListView(generics.ListAPIView):
     serializer_class = GameSerializer
     permission_classes = [IsAuthenticated]
@@ -126,21 +135,11 @@ class FriendListView(generics.ListAPIView):
         return Response(serializer.data)
 
 
-class FriendRequestListView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = FriendRequestSerialier
-
-    def get_queryset(self):
-        user = self.request.user
-        return FriendRequest.objects.filter(receiver=user, is_active=True)
-
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def add_friend(request):
+def add_friend(request, pk):
     user = request.user
-    friend_id = request.data["friend"]
-    friend = get_object_or_404(User, pk=friend_id)
+    friend = get_object_or_404(User, pk=pk)
     try:
         FriendRequest.objects.create(sender=user, receiver=friend)
         return Response(
@@ -153,41 +152,28 @@ def add_friend(request):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def accept_friend(request):
-    user = request.user
-    friend_id = request.data["friend"]
-    friend = get_object_or_404(User, pk=friend_id)
-    try:
-        friend_request = FriendRequest.objects.get(sender=friend, receiver=user)
-        friend_request.accept()
-        return Response(
-            {"message": f"You and {friend.username} have become friends."},
-            status=status.HTTP_201_CREATED,
-        )
-    except:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+def accept_friend(request, pk):
+    friend_request = get_object_or_404(FriendRequest, pk=pk)
+    friend_request.accept()
+    return Response(
+        {"message": f"You and {friend_request.sender} have become friends."},
+        status=status.HTTP_201_CREATED,
+    )
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def decline_friend(request):
-    user = request.user
-    friend_id = request.data["friend"]
-    friend = get_object_or_404(User, pk=friend_id)
-    try:
-        friend_request = FriendRequest.objects.get(sender=friend, receiver=user)
-        friend_request.decline()
-        return Response(status=status.HTTP_200_OK)
-    except:
-        return Response(status=status.HTTP_404_NOT_FOUND)
+def decline_friend(request, pk):
+    friend_request = get_object_or_404(FriendRequest, pk=pk)
+    friend_request.decline()
+    return Response(status=status.HTTP_200_OK)
 
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
-def remove_friend(request):
+def remove_friend(request, pk):
     user = request.user
-    friend = request.data["friend"]
-    friendship = get_object_or_404(Friendship, user=user, friend=friend)
+    friendship = get_object_or_404(Friendship, user=user, friend=pk)
     friendship.break_friendship()
     return Response({"message": "Friendship is broken!"}, status=status.HTTP_200_OK)
 
