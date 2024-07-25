@@ -29,7 +29,6 @@ urlpatterns = [
     path("friends/<int:pk>/remove/", remove_friend, name="friend-remove"),
     path("friends/requests/<int:pk>/accept/", accept_friend, name="friend-accept-request"),
     path("friends/requests/<int:pk>/decline/", decline_friend, name="friend-decline-request"),
-    path("games/<int:pk>/", GameListView.as_view(), name="game-list"),
-    path("games/challenge/send/<int:user_id>/", send_challenge, name="challenge-send"),
-    path("games/challenge/accept/<int:pk>/", accept_challenge, name="challenge-accept"),
+    path("games/challenges/send/<int:user_id>/", send_challenge, name="challenge-send"),
+    path("games/challenges/<int:pk>/accept/", accept_challenge, name="challenge-accept"),
 ]

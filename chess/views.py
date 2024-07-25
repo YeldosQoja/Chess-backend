@@ -185,14 +185,13 @@ channel_layer = get_channel_layer()
 @permission_classes([IsAuthenticated])
 def send_challenge(request, user_id):
     opponent = get_object_or_404(User, pk=user_id)
-    game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
     # If friend is currently online send message to friend's channel
-    friend_socket_channel = UserChannel.objects.filter(user=opponent)
-    if friend_socket_channel.exists():
-        async_to_sync(channel_layer.send)(
-            friend_socket_channel.first().name,
-            {"type": "on.challenge", "request_id": game_request.pk},
-        )
+    friend_channel = get_object_or_404(UserChannel, user=opponent)
+    game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
+    async_to_sync(channel_layer.send)(
+        friend_channel.name,
+        {"type": "on.challenge", "request_id": game_request.pk},
+    )
     return Response(status=status.HTTP_201_CREATED)
 
 
@@ -214,7 +213,7 @@ def accept_challenge(request, pk):
         opponent_socket_channel.first().name,
         {"type": "on.challenge.accept", "game_id": game.pk},
     )
-    return Response(status=status.HTTP_201_CREATED)
+    return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
 
 
 class GameListView(generics.ListAPIView):
