@@ -158,7 +158,6 @@ class GameRequest(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
 
-
 class UserChannel(models.Model):
     name = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

@@ -2,7 +2,7 @@ import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.core.exceptions import ObjectDoesNotExist
 from channels.db import database_sync_to_async
-from .models import Game, UserChannel
+from .models import UserChannel
 
 
 class MainConsumer(AsyncWebsocketConsumer):
@@ -24,14 +24,23 @@ class MainConsumer(AsyncWebsocketConsumer):
     async def receive(self, text_data=None, bytes_data=None):
         print(text_data)
 
-    async def disconnect(self):
+    async def disconnect(self, code):
+        print("disconnect", self.user, "channel name", self.channel_name)
         await self.delete_channel()
         await self.close()
 
     async def on_challenge(self, event):
         await self.send(
             text_data=json.dumps(
-                {"type": "challenge", "request_id": event["request_id"]}
+                {
+                    "type": "challenge",
+                    "request_id": event["request_id"],
+                    "user": {
+                        "id": self.user.pk,
+                        "username": self.user.username,
+                        "name": self.user.first_name + self.user.last_name,
+                    },
+                }
             )
         )
 
@@ -41,6 +50,19 @@ class MainConsumer(AsyncWebsocketConsumer):
                 {
                     "type": "challenge_accepted",
                     "game_id": event["game_id"],
+                }
+            )
+        )
+
+    async def on_movement(self, event):
+        print("on_movement", self.user, "channel name", self.channel_name)
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "move",
+                    "game_id": event["game_id"],
+                    "from": event["from"],
+                    "to": event["to"],
                 }
             )
         )

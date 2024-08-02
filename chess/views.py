@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login
 from rest_framework import status, generics
 from rest_framework.exceptions import AuthenticationFailed
 from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
@@ -15,6 +15,7 @@ from django.shortcuts import get_object_or_404
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db.models import Q
+import json
 
 
 # Create your views here.
@@ -26,6 +27,9 @@ def user_signin(request):
         email = request.data["email"]
         password = request.data["password"]
         user = authenticate(email=email, password=password)
+        # Attach authenticated user to the current session
+        # Essential for authenticating websocket connections
+        login(request, user)
         if not user:
             raise AuthenticationFailed(
                 "No active account found with the given credentials"
@@ -135,6 +139,18 @@ class FriendListView(generics.ListAPIView):
         return Response(serializer.data)
 
 
+class GameListView(generics.ListAPIView):
+    serializer_class = GameSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = Game.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        pk = kwargs["pk"]
+        user = get_object_or_404(User, pk=pk)
+        serializer = self.get_serializer(user.profile.games(), many=True)
+        return Response(serializer.data)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def add_friend(request, pk):
@@ -199,6 +215,27 @@ def send_challenge(request, user_id):
 @permission_classes([IsAuthenticated])
 def accept_challenge(request, pk):
     game_request = get_object_or_404(GameRequest, pk=pk)
+    # Invalidate game request
+    game_request.is_active = False
+    game_request.save()
+    opponent = game_request.sender
+    # If sender of request is no longer online, we return error response
+    opponent_socket_channel = get_object_or_404(UserChannel, user=opponent)
+    game = Game.objects.create(challenger=opponent, opponent=request.user)
+    async_to_sync(channel_layer.send)(
+        opponent_socket_channel.name,
+        {"type": "on.challenge.accept", "game_id": game.pk},
+    )
+    return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def decline_challenge(request, pk):
+    game_request = get_object_or_404(GameRequest, pk=pk)
+    # Invalidate game request
+    game_request.is_active = False
+    game_request.save()
     opponent = game_request.sender
     opponent_socket_channel = UserChannel.objects.filter(user=opponent)
     # If sender of request is no longer online, we return error response
@@ -216,13 +253,29 @@ def accept_challenge(request, pk):
     return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
 
 
-class GameListView(generics.ListAPIView):
+class GameRetrieveView(generics.RetrieveAPIView):
     serializer_class = GameSerializer
     permission_classes = [IsAuthenticated]
-    queryset = Game.objects.all()
 
-    def get(self, request, *args, **kwargs):
-        pk = kwargs["pk"]
-        user = get_object_or_404(User, pk=pk)
-        serializer = self.get_serializer(user.profile.games(), many=True)
-        return Response(serializer.data)
+    def get_queryset(self):
+        return Game.objects.filter(Q(challenger=self.request.user) | Q(opponent=self.request.user), is_active=True)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def move_piece(request, pk):
+    game = get_object_or_404(Game, pk=pk)
+    opponent = game.challenger if game.opponent == request.user else game.opponent
+    opponent_socket_channel = get_object_or_404(UserChannel, user=opponent)
+    move_json = request.body.decode()
+    move_dict = json.loads(move_json)
+    async_to_sync(channel_layer.send)(
+        opponent_socket_channel.name,
+        {
+            "type": "on.movement",
+            "game_id": game.pk,
+            "from": move_dict["from"],
+            "to": move_dict["to"],
+        },
+    )
+    return Response(status=status.HTTP_200_OK)
