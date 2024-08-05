@@ -257,23 +257,3 @@ class GameRetrieveView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return Game.objects.filter(Q(challenger=self.request.user) | Q(opponent=self.request.user), is_active=True)
-
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def move_piece(request, pk):
-    game = get_object_or_404(Game, pk=pk)
-    opponent = game.challenger if game.opponent == request.user else game.opponent
-    opponent_socket_channel = get_object_or_404(UserChannel, user=opponent)
-    move_json = request.body.decode()
-    move_dict = json.loads(move_json)
-    async_to_sync(channel_layer.send)(
-        opponent_socket_channel.name,
-        {
-            "type": "on.movement",
-            "game_id": game.pk,
-            "from": move_dict["from"],
-            "to": move_dict["to"],
-        },
-    )
-    return Response(status=status.HTTP_200_OK)

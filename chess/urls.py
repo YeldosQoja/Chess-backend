@@ -16,7 +16,6 @@ from .views import (
     send_challenge,
     accept_challenge,
     decline_challenge,
-    move_piece,
 )
 
 urlpatterns = [
@@ -36,5 +35,4 @@ urlpatterns = [
     path("games/challenges/send/<int:user_id>/", send_challenge, name="game-challenge-send"),
     path("games/challenges/<int:pk>/accept/", accept_challenge, name="game-challenge-accept"),
     path("games/challenges/<int:pk>/decline/", decline_challenge, name="game-challenge-decline"),
-    path("games/<int:pk>/move/", move_piece, name="game-move-piece"),
 ]

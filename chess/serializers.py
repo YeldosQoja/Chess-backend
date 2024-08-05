@@ -28,7 +28,7 @@ class FriendRequestSerialier(serializers.ModelSerializer):
     sender = UserSerializer()
     class Meta:
         model = FriendRequest
-        fields = ["id", "sender", "created_at", "is_active"]
+        fields = ["id", "sender", "created_at", "is_active", "is_accepted"]
         extra_kwargs = {"is_active": {"read_only": True}}
 
 
