@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login
 from rest_framework import status, generics
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, NotFound
 from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
@@ -64,6 +64,17 @@ class CreateUserView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def home(request):
+    games = Game.objects.filter(is_active=False).order_by("finished_at")
+    response_data = { "games": games }
+    if games.exists():
+        latest_game = games[0]
+        response_data["latest_game"] = latest_game
+    return Response(response_data, status=status.HTTP_200_OK)
 
 
 class UserListView(generics.ListAPIView):
@@ -215,12 +226,13 @@ def send_challenge(request, user_id):
 @permission_classes([IsAuthenticated])
 def accept_challenge(request, pk):
     game_request = get_object_or_404(GameRequest, pk=pk)
-    # Invalidate game request
-    game_request.is_active = False
-    game_request.save()
     opponent = game_request.sender
     # If sender of request is no longer online, we return error response
     opponent_socket_channel = get_object_or_404(UserChannel, user=opponent)
+    # Invalidate game request
+    game_request.is_active = False
+    game_request.is_accepted = True
+    game_request.save()
     game = Game.objects.create(challenger=opponent, opponent=request.user)
     async_to_sync(channel_layer.send)(
         opponent_socket_channel.name,
@@ -236,21 +248,7 @@ def decline_challenge(request, pk):
     # Invalidate game request
     game_request.is_active = False
     game_request.save()
-    opponent = game_request.sender
-    opponent_socket_channel = UserChannel.objects.filter(user=opponent)
-    # If sender of request is no longer online, we return error response
-    if not opponent_socket_channel.exists():
-        return Response(
-            {"error": "Your opponent is not online."}, status=status.HTTP_403_FORBIDDEN
-        )
-    game_request.is_active = False
-    game_request.save()
-    game = Game.objects.create(challenger=opponent, opponent=request.user)
-    async_to_sync(channel_layer.send)(
-        opponent_socket_channel.first().name,
-        {"type": "on.challenge.accept", "game_id": game.pk},
-    )
-    return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
+    return Response(status=status.HTTP_201_CREATED)
 
 
 class GameRetrieveView(generics.RetrieveAPIView):

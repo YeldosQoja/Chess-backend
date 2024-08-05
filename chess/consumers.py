@@ -1,5 +1,5 @@
 import json
-from channels.generic.websocket import AsyncWebsocketConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer, AsyncJsonWebsocketConsumer
 from django.core.exceptions import ObjectDoesNotExist
 from channels.db import database_sync_to_async
 from .models import UserChannel
@@ -25,7 +25,6 @@ class MainConsumer(AsyncWebsocketConsumer):
         print(text_data)
 
     async def disconnect(self, code):
-        print("disconnect", self.user, "channel name", self.channel_name)
         await self.delete_channel()
         await self.close()
 
@@ -55,7 +54,6 @@ class MainConsumer(AsyncWebsocketConsumer):
         )
 
     async def on_movement(self, event):
-        print("on_movement", self.user, "channel name", self.channel_name)
         await self.send(
             text_data=json.dumps(
                 {

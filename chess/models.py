@@ -155,8 +155,10 @@ class GameRequest(models.Model):
     receiver = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="game_receiver"
     )
+    is_accepted = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
+
 
 class UserChannel(models.Model):
     name = models.CharField(max_length=100, unique=True)
