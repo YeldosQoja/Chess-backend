@@ -14,18 +14,41 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(required=False)
+
     class Meta:
         model = User
-        fields = ["id", "email", "username", "first_name", "last_name", "date_joined", "password", "profile"]
+        fields = [
+            "id",
+            "email",
+            "username",
+            "first_name",
+            "last_name",
+            "date_joined",
+            "password",
+            "profile",
+        ]
         extra_kwargs = {"password": {"write_only": True}}
 
     def create(self, validated_data):
         user = User.objects.create_user(**validated_data)
         return user
 
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        request = self.context.get("request", None)
+        if request and hasattr(request, "user"):
+            representation["is_friend"] = request.user.friends.filter(
+                pk=instance.pk
+            ).exists()
+            representation["is_requested"] = FriendRequest.objects.filter(
+                sender=request.user, receiver=instance, is_active=True
+            ).exists()
+        return representation
+
 
 class FriendRequestSerialier(serializers.ModelSerializer):
     sender = UserSerializer()
+
     class Meta:
         model = FriendRequest
         fields = ["id", "sender", "created_at", "is_active", "is_accepted"]
@@ -40,10 +63,20 @@ class GameSerializer(serializers.ModelSerializer):
     def get_is_white(self, obj):
         request = self.context["request"]
         if request and hasattr(request, "user"):
-            return obj.challenger == request.user            
+            return obj.challenger == request.user
         return False
 
     class Meta:
         model = Game
-        fields = ["id", "challenger", "opponent", "winner", "is_white", "is_active", "created_at", "started_at", "finished_at"]
+        fields = [
+            "id",
+            "challenger",
+            "opponent",
+            "winner",
+            "is_white",
+            "is_active",
+            "created_at",
+            "started_at",
+            "finished_at",
+        ]
         read_only_fields = ["is_white"]

@@ -103,6 +103,7 @@ class FriendRequest(models.Model):
     receiver = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="receiver"
     )
+    is_accepted = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

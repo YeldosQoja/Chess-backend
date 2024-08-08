@@ -101,6 +101,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 "player": move["player"],
                 "from": move["from"],
                 "to": move["to"],
+                "timestamp": move["timestamp"],
             },
         )
     
@@ -112,6 +113,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 "player": promotion["player"],
                 "square": promotion["square"],
                 "piece": promotion["piece"],
+                "timestamp": promotion["timestamp"],
             }
         )
 
@@ -124,6 +126,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             "player": event["player"],
             "from": event["from"],
             "to": event["to"],
+            "timestamp": event["timestamp"],
         })
 
     async def chess_promote(self, event):
@@ -132,6 +135,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             "player": event["player"],
             "square": event["square"],
             "piece": event["piece"],
+            "timestamp": event["timestamp"],
         })
 
     async def chess_resign(self, event):

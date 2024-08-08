@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login
 from rest_framework import status, generics
-from rest_framework.exceptions import AuthenticationFailed, NotFound
+from rest_framework.exceptions import AuthenticationFailed
 from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
@@ -15,8 +15,6 @@ from django.shortcuts import get_object_or_404
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db.models import Q
-import json
-
 
 # Create your views here.
 @api_view(["POST"])
@@ -70,7 +68,7 @@ class CreateUserView(generics.CreateAPIView):
 @permission_classes([IsAuthenticated])
 def home(request):
     games = Game.objects.filter(is_active=False).order_by("finished_at")
-    response_data = { "games": games }
+    response_data = {"games": games}
     if games.exists():
         latest_game = games[0]
         response_data["latest_game"] = latest_game
@@ -168,9 +166,22 @@ def add_friend(request, pk):
     user = request.user
     friend = get_object_or_404(User, pk=pk)
     try:
+        if friend in user.friends.all():
+            return Response(
+                {"message": f"You and {friend} are already friends."},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED,
+            )
+        friend_request = FriendRequest.objects.filter(sender=user, receiver=friend)
+        if friend_request.exists():
+            return Response(
+                {"message": "You have already sent friend request to this user."},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED,
+            )
         FriendRequest.objects.create(sender=user, receiver=friend)
         return Response(
-            {"message": f"You have send a friend request to the user {friend}"},
+            {
+                "message": f"You have sent a friend request to the user {friend}",
+            },
             status=status.HTTP_201_CREATED,
         )
     except:
@@ -256,4 +267,7 @@ class GameRetrieveView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Game.objects.filter(Q(challenger=self.request.user) | Q(opponent=self.request.user), is_active=True)
+        return Game.objects.filter(
+            Q(challenger=self.request.user) | Q(opponent=self.request.user),
+            is_active=True,
+        )
