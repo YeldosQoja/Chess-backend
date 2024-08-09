@@ -56,27 +56,28 @@ class FriendRequestSerialier(serializers.ModelSerializer):
 
 
 class GameSerializer(serializers.ModelSerializer):
-    challenger = UserSerializer()
-    opponent = UserSerializer()
-    is_white = serializers.SerializerMethodField()
-
-    def get_is_white(self, obj):
-        request = self.context["request"]
-        if request and hasattr(request, "user"):
-            return obj.challenger == request.user
-        return False
-
     class Meta:
         model = Game
         fields = [
             "id",
-            "challenger",
-            "opponent",
             "winner",
-            "is_white",
             "is_active",
             "created_at",
             "started_at",
             "finished_at",
         ]
-        read_only_fields = ["is_white"]
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request", None)
+        if request and hasattr(request, "user"):
+            user = self.context.get("user", None)
+            if user is None:
+                user = request.user
+            is_white = user == instance.challenger
+            opponent = instance.opponent if is_white else instance.challenger
+            serializer = UserSerializer(opponent, context={"request": request})
+            ret["opponent"] = serializer.data
+            ret["is_white"] = is_white
+            ret["is_winner"] = user.pk == instance.winner
+        return ret

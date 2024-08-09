@@ -16,6 +16,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db.models import Q
 
+
 # Create your views here.
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -148,16 +149,14 @@ class FriendListView(generics.ListAPIView):
         return Response(serializer.data)
 
 
-class GameListView(generics.ListAPIView):
-    serializer_class = GameSerializer
-    permission_classes = [IsAuthenticated]
-    queryset = Game.objects.all()
-
-    def get(self, request, *args, **kwargs):
-        pk = kwargs["pk"]
-        user = get_object_or_404(User, pk=pk)
-        serializer = self.get_serializer(user.profile.games(), many=True)
-        return Response(serializer.data)
+@api_view(["GET"])
+def user_games(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    games = user.profile.games()
+    serializer = GameSerializer(
+        games, many=True, context={"request": request, "user": user}
+    )
+    return Response(serializer.data)
 
 
 @api_view(["POST"])
