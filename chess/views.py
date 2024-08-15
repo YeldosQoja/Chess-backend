@@ -223,10 +223,14 @@ channel_layer = get_channel_layer()
 def send_challenge(request, user_id):
     opponent = get_object_or_404(User, pk=user_id)
     # If friend is currently online send message to friend's channel
-    friend_channel = get_object_or_404(UserChannel, user=opponent)
+    friend_channel = UserChannel.objects.filter(user=opponent)
+    if not friend_channel.exists():
+        return Response({ "message": f"{opponent} is not currently online" }, status=status.HTTP_404_NOT_FOUND)
+    if opponent.profile.is_playing():
+        return Response({ "message": f"{opponent} is already playing" }, status=status.HTTP_404_NOT_FOUND)
     game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
     async_to_sync(channel_layer.send)(
-        friend_channel.name,
+        friend_channel.first().name,
         {"type": "on.challenge", "request_id": game_request.pk},
     )
     return Response(status=status.HTTP_201_CREATED)

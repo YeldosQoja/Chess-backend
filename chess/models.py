@@ -61,8 +61,11 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     avatar = models.URLField(null=True)
 
+    def is_playing(self):
+        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=True).exists()
+
     def games(self):
-        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user))
+        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=False)
 
     def wins(self):
         user_games = self.games()
