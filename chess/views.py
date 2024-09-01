@@ -225,9 +225,15 @@ def send_challenge(request, user_id):
     # If friend is currently online send message to friend's channel
     friend_channel = UserChannel.objects.filter(user=opponent)
     if not friend_channel.exists():
-        return Response({ "message": f"{opponent} is not currently online" }, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"message": f"{opponent} is not currently online"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     if opponent.profile.is_playing():
-        return Response({ "message": f"{opponent} is already playing" }, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"message": f"{opponent} is already playing"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
     async_to_sync(channel_layer.send)(
         friend_channel.first().name,
@@ -274,3 +280,27 @@ class GameRetrieveView(generics.RetrieveAPIView):
             Q(challenger=self.request.user) | Q(opponent=self.request.user),
             is_active=True,
         )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def finish_game(request, pk):
+    winner_color = request.data.get("winner", None)
+    finished_at = request.data.get("finished_at", None)
+    if finished_at is None:
+        return Response(
+            {"message": "finished_at parameter is not provided!"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    
+    game = get_object_or_404(Game, pk=pk)
+
+    winner = None
+    if winner_color == "white":
+        winner = game.challenger
+    elif winner_color == "black":
+        winner = game.opponent
+    
+    game.finish(winner, finished_at)
+
+    return Response(status=status.HTTP_200_OK)

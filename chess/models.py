@@ -143,12 +143,12 @@ class Game(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
     started_at = models.DateTimeField(null=True)
-    finished_at = models.DateField(null=True)
+    finished_at = models.DateTimeField(null=True)
 
-    def finish(self, winner=None):
+    def finish(self, winner, finished_at):
         self.is_active = False
-        self.finished_at = timezone.now()
-        self.winner = winner
+        self.finished_at = finished_at
+        self.winner = winner.pk
         self.save()
 
 
