@@ -77,15 +77,19 @@ class GameSerializer(serializers.ModelSerializer):
             is_white = user == instance.challenger
             player = "white" if is_white else "black"
             opponent = instance.opponent if is_white else instance.challenger
+            serializer = UserSerializer(instance.challenger, context={ "request": request })
+            ret["white"] = serializer.data
+            serializer = UserSerializer(instance.opponent, context={ "request": request })
+            ret["black"] = serializer.data
             serializer = UserSerializer(opponent, context={"request": request})
             ret["is_white"] = is_white
             ret["player"] = player
             ret["opponent"] = serializer.data
             ret["is_winner"] = user.pk == instance.winner
             winner = None
-            if instance.challenger == instance.winner:
+            if instance.challenger.pk == instance.winner:
                 winner = "white"
-            if instance.opponent == instance.winner:
+            if instance.opponent.pk == instance.winner:
                 winner = "black"
             ret["winner"] = winner
         return ret

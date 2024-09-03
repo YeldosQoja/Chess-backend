@@ -68,10 +68,11 @@ class CreateUserView(generics.CreateAPIView):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def home(request):
-    games = Game.objects.filter(is_active=False).order_by("finished_at")
-    response_data = {"games": games}
+    games = request.user.profile.games()[:5]
+    serializer = GameSerializer(games, many=True, context={"request": request, "user": request.user})
+    response_data = {"games": serializer.data}
     if games.exists():
-        latest_game = games[0]
+        latest_game = serializer.data[0]
         response_data["latest_game"] = latest_game
     return Response(response_data, status=status.HTTP_200_OK)
 
@@ -277,8 +278,7 @@ class GameRetrieveView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return Game.objects.filter(
-            Q(challenger=self.request.user) | Q(opponent=self.request.user),
-            is_active=True,
+            Q(challenger=self.request.user) | Q(opponent=self.request.user)
         )
 
 
@@ -292,7 +292,7 @@ def finish_game(request, pk):
             {"message": "finished_at parameter is not provided!"},
             status=status.HTTP_400_BAD_REQUEST,
         )
-    
+
     game = get_object_or_404(Game, pk=pk)
 
     winner = None
@@ -300,7 +300,7 @@ def finish_game(request, pk):
         winner = game.challenger
     elif winner_color == "black":
         winner = game.opponent
-    
+
     game.finish(winner, finished_at)
 
     return Response(status=status.HTTP_200_OK)

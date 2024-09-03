@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    home,
     UserListView,
     UserDetailView,
     ProfileView,
@@ -20,6 +21,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("home/", home, name="home"),
     path("profile/", ProfileView.as_view(), name="profile"),
     path("profile/friends/", ProfileFriendListView.as_view(), name="profile-friend-list"),
     path("profile/games/", ProfileGameListView.as_view(), name="profile-game-list"),

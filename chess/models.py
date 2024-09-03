@@ -65,7 +65,7 @@ class Profile(models.Model):
         return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=True).exists()
 
     def games(self):
-        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=False)
+        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=False).order_by("-finished_at")
 
     def wins(self):
         user_games = self.games()
