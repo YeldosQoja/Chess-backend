@@ -36,7 +36,7 @@ class UserSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         request = self.context.get("request", None)
-        if request and hasattr(request, "user"):
+        if request and hasattr(request, "user") and not request.user.is_anonymous:
             representation["is_friend"] = request.user.friends.filter(
                 pk=instance.pk
             ).exists()
