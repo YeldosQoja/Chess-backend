@@ -32,9 +32,9 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "") != "False"
 
-ALLOWED_HOSTS = ["yeldoskozha.pythonanywhere.com"]
+ALLOWED_HOSTS = ["yeldoskozha.pythonanywhere.com", "127.0.0.1"]
 
-CSRF_TRUSTED_ORIGINS = ['https://yeldoskozha.pythonanywhere.com']
+CSRF_TRUSTED_ORIGINS = ["https://yeldoskozha.pythonanywhere.com"]
 
 # REST FRAMEWORK
 REST_FRAMEWORK = {
@@ -154,6 +154,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
