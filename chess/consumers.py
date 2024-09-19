@@ -10,18 +10,21 @@ from .models import UserChannel
 class MainConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = self.scope["user"]
-        try:
-            channel = await database_sync_to_async(UserChannel.objects.get)(
-                user=self.user.pk
-            )
-            channel.name = self.channel_name
-            await database_sync_to_async(channel.save)()
-        except UserChannel.DoesNotExist:
-            await database_sync_to_async(UserChannel.objects.create)(
-                name=self.channel_name, user=self.user
-            )
-        finally:
-            await self.accept()
+        if self.user.is_anonymous:
+            self.close()
+        else:
+            try:
+                channel = await database_sync_to_async(UserChannel.objects.get)(
+                    user=self.user.pk
+                )
+                channel.name = self.channel_name
+                await database_sync_to_async(channel.save)()
+            except UserChannel.DoesNotExist:
+                await database_sync_to_async(UserChannel.objects.create)(
+                    name=self.channel_name, user=self.user
+                )
+            finally:
+                await self.accept()
 
     async def receive(self, text_data=None, bytes_data=None):
         print(text_data)

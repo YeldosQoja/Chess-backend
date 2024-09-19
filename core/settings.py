@@ -45,7 +45,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=2),
 }
 
 # Application definition
@@ -100,9 +100,14 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [{
+                "host": os.environ.get("REDIS_HOST"),
+                "port": os.environ.get("REDIS_PORT"),
+                "username": os.environ.get("REDIS_USERNAME"),
+                "password": os.environ.get("REDIS_PASSWORD"),
+            }]
         },
-    },
+    }
 }
 
 # Database
@@ -164,5 +169,5 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "chess.User"
 
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = os.environ.get("DEBUG", "") != "True"
+SESSION_COOKIE_SECURE = os.environ.get("DEBUG", "") != "True"

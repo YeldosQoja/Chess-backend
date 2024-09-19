@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from rest_framework import status, generics
 from rest_framework.exceptions import AuthenticationFailed
 from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
@@ -25,14 +25,14 @@ def user_signin(request):
     try:
         email = request.data["email"]
         password = request.data["password"]
-        user = authenticate(email=email, password=password)
-        # Attach authenticated user to the current session
-        # Essential for authenticating websocket connections
-        login(request, user)
+        user = authenticate(request, email=email, password=password)
         if not user:
             raise AuthenticationFailed(
                 "No active account found with the given credentials"
             )
+        # Attach authenticated user to the current session
+        # Essential for authenticating websocket connections
+        login(request, user)
         serializer = UserSerializer(user)
         refresh = RefreshToken.for_user(user)
         return Response(
@@ -56,6 +56,13 @@ def user_signin(request):
                     status=status.HTTP_404_NOT_FOUND,
                 )
         return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def user_signout(request):
+    logout(request)
+    return Response(status=status.HTTP_200_OK)
 
 
 class CreateUserView(generics.CreateAPIView):
