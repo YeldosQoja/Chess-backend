@@ -41,9 +41,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_joined = models.DateTimeField(default=timezone.now)
-    friends = models.ManyToManyField("self", through="Friendship")
     is_active = models.BooleanField(default=True)
     is_admin = models.BooleanField(default=False)
+    friends = models.ManyToManyField("self", through="Friendship")
+    chats = models.ManyToManyField("ChatRoom", through="ChatMembership", related_name="members")
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
@@ -58,14 +59,20 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, primary_key=True
+    )
     avatar = models.URLField(null=True)
 
     def is_playing(self):
-        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=True).exists()
+        return Game.objects.filter(
+            Q(challenger=self.user) | Q(opponent=self.user), is_active=True
+        ).exists()
 
     def games(self):
-        return Game.objects.filter(Q(challenger=self.user) | Q(opponent=self.user), is_active=False).order_by("-finished_at")
+        return Game.objects.filter(
+            Q(challenger=self.user) | Q(opponent=self.user), is_active=False
+        ).order_by("-finished_at")
 
     def wins(self):
         user_games = self.games()
@@ -167,3 +174,25 @@ class GameRequest(models.Model):
 class UserChannel(models.Model):
     name = models.CharField(max_length=100, unique=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+
+
+class ChatMembership(models.Model):
+    member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="member")
+    chat = models.ForeignKey("ChatRoom", on_delete=models.CASCADE, related_name="chat")
+
+
+class ChatRoom(models.Model):
+    group_name = models.CharField(max_length=50, null=True, default=None)
+    is_group = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class ChatMessage(models.Model):
+    room = models.ForeignKey(
+        ChatRoom, on_delete=models.CASCADE, related_name="messages"
+    )
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, default=None)

@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Profile, FriendRequest, Game
+from .models import Profile, FriendRequest, Game, ChatRoom, ChatMessage
 
 
 User = get_user_model()
@@ -93,3 +93,17 @@ class GameSerializer(serializers.ModelSerializer):
                 winner = "black"
             ret["winner"] = winner
         return ret
+
+
+class ChatMessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+    class Meta:
+        model = ChatMessage
+        fields = ["id", "room", "sender", "content", "created_at", "edited_at"]
+
+
+class ChatRoomSerializer(serializers.ModelSerializer):
+    members = UserSerializer(many=True, read_only=True)
+    class Meta:
+        model = ChatRoom
+        fields = ["id", "members", "created_at", "updated_at"]
