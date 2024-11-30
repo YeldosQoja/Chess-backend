@@ -170,6 +170,15 @@ class GameRequest(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
 
+    def accept(self) -> None:
+        self.is_accepted = True
+        self.is_active = False
+        self.save()
+    
+    def decline(self) -> None:
+        self.is_active = False
+        self.save()
+
 
 class UserChannel(models.Model):
     name = models.CharField(max_length=100, unique=True)

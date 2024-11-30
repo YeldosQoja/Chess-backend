@@ -76,7 +76,9 @@ class CreateUserView(generics.CreateAPIView):
 @permission_classes([IsAuthenticated])
 def home(request):
     games = request.user.profile.games()[:5]
-    serializer = GameSerializer(games, many=True, context={"request": request, "user": request.user})
+    serializer = GameSerializer(
+        games, many=True, context={"request": request, "user": request.user}
+    )
     response_data = {"games": serializer.data}
     if games.exists():
         latest_game = serializer.data[0]
@@ -228,24 +230,16 @@ channel_layer = get_channel_layer()
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def send_challenge(request, user_id):
-    opponent = get_object_or_404(User, pk=user_id)
-    # If friend is currently online send message to friend's channel
-    friend_channel = UserChannel.objects.filter(user=opponent)
-    if not friend_channel.exists():
-        return Response(
-            {"message": f"{opponent} is not currently online"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
+def send_challenge(request, username):
+    opponent = get_object_or_404(User, username=username)
     if opponent.profile.is_playing():
         return Response(
             {"message": f"{opponent} is already playing"},
             status=status.HTTP_404_NOT_FOUND,
         )
     game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
-    async_to_sync(channel_layer.send)(
-        friend_channel.first().name,
-        {"type": "on.challenge", "request_id": game_request.pk},
+    async_to_sync(channel_layer.group_send)(
+        username, {"type": "game.challenge", "request_id": game_request.pk}
     )
     return Response(status=status.HTTP_201_CREATED)
 
@@ -255,16 +249,12 @@ def send_challenge(request, user_id):
 def accept_challenge(request, pk):
     game_request = get_object_or_404(GameRequest, pk=pk)
     opponent = game_request.sender
-    # If sender of request is no longer online, we return error response
-    opponent_socket_channel = get_object_or_404(UserChannel, user=opponent)
     # Invalidate game request
-    game_request.is_active = False
-    game_request.is_accepted = True
-    game_request.save()
+    game_request.accept()
     game = Game.objects.create(challenger=opponent, opponent=request.user)
-    async_to_sync(channel_layer.send)(
-        opponent_socket_channel.name,
-        {"type": "on.challenge.accept", "game_id": game.pk},
+    async_to_sync(channel_layer.group_send)(
+        opponent.username,
+        {"type": "challenge.accept", "game_id": game.pk},
     )
     return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
 
@@ -273,9 +263,7 @@ def accept_challenge(request, pk):
 @permission_classes([IsAuthenticated])
 def decline_challenge(request, pk):
     game_request = get_object_or_404(GameRequest, pk=pk)
-    # Invalidate game request
-    game_request.is_active = False
-    game_request.save()
+    game_request.decline()
     return Response(status=status.HTTP_201_CREATED)
 
 

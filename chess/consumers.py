@@ -3,77 +3,41 @@ from channels.generic.websocket import (
     AsyncWebsocketConsumer,
     AsyncJsonWebsocketConsumer,
 )
-from channels.db import database_sync_to_async
-from .models import UserChannel
-
 
 class MainConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.user = self.scope["user"]
+        user = self.scope["user"]
         if self.user.is_anonymous:
-            self.close()
+            await self.close()
         else:
-            try:
-                channel = await database_sync_to_async(UserChannel.objects.get)(
-                    user=self.user.pk
-                )
-                channel.name = self.channel_name
-                await database_sync_to_async(channel.save)()
-            except UserChannel.DoesNotExist:
-                await database_sync_to_async(UserChannel.objects.create)(
-                    name=self.channel_name, user=self.user
-                )
-            finally:
-                await self.accept()
-
-    async def receive(self, text_data=None, bytes_data=None):
-        print(text_data)
+            self.username = user.username
+            await self.channel_layer.group_add(self.username, self.channel_name)
+            await self.accept()
 
     async def disconnect(self, code):
-        await self.delete_channel()
+        await self.channel_layer.group_discard(self.username, self.channel_name)
         await self.close()
 
-    async def on_challenge(self, event):
+    async def game_challenge(self, event):
         await self.send(
             text_data=json.dumps(
                 {
                     "type": "challenge",
                     "request_id": event["request_id"],
-                    "user": {
-                        "id": self.user.pk,
-                        "username": self.user.username,
-                        "name": self.user.first_name + self.user.last_name,
-                    },
+                    "username": self.username,
                 }
             )
         )
 
-    async def on_challenge_accept(self, event):
+    async def challenge_accept(self, event):
         await self.send(
             text_data=json.dumps(
                 {
-                    "type": "challenge_accepted",
+                    "type": "challenge_accept",
                     "game_id": event["game_id"],
                 }
             )
         )
-
-    async def on_movement(self, event):
-        await self.send(
-            text_data=json.dumps(
-                {
-                    "type": "move",
-                    "game_id": event["game_id"],
-                    "from": event["from"],
-                    "to": event["to"],
-                }
-            )
-        )
-
-    @database_sync_to_async
-    def delete_channel(self):
-        UserChannel.objects.filter(name=self.channel_name).delete()
-
 
 class GameConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
@@ -92,7 +56,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             await self.send_promotion(content)
         elif command == "resign":
             await self.send_resign(content)
-        
+
     async def disconnect(self, code):
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
@@ -107,7 +71,7 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 "timestamp": move["timestamp"],
             },
         )
-    
+
     async def send_promotion(self, promotion):
         await self.channel_layer.group_send(
             self.room_name,
@@ -117,29 +81,33 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 "square": promotion["square"],
                 "piece": promotion["piece"],
                 "timestamp": promotion["timestamp"],
-            }
+            },
         )
 
     async def send_resign(self, data):
         pass
 
     async def chess_move(self, event):
-        await self.send_json({
-            "msg_type": "move",
-            "player": event["player"],
-            "from": event["from"],
-            "to": event["to"],
-            "timestamp": event["timestamp"],
-        })
+        await self.send_json(
+            {
+                "msg_type": "move",
+                "player": event["player"],
+                "from": event["from"],
+                "to": event["to"],
+                "timestamp": event["timestamp"],
+            }
+        )
 
     async def chess_promote(self, event):
-        await self.send_json({
-            "msg_type": "promote",
-            "player": event["player"],
-            "square": event["square"],
-            "piece": event["piece"],
-            "timestamp": event["timestamp"],
-        })
+        await self.send_json(
+            {
+                "msg_type": "promote",
+                "player": event["player"],
+                "square": event["square"],
+                "piece": event["piece"],
+                "timestamp": event["timestamp"],
+            }
+        )
 
     async def chess_resign(self, event):
         pass
