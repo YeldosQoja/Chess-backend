@@ -7,7 +7,7 @@ from channels.generic.websocket import (
 class MainConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         user = self.scope["user"]
-        if self.user.is_anonymous:
+        if user.is_anonymous:
             await self.close()
         else:
             self.username = user.username
@@ -23,8 +23,8 @@ class MainConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps(
                 {
                     "type": "challenge",
-                    "request_id": event["request_id"],
-                    "username": self.username,
+                    "requestId": event["request_id"],
+                    "username": event["username"],
                 }
             )
         )
@@ -34,10 +34,11 @@ class MainConsumer(AsyncWebsocketConsumer):
             text_data=json.dumps(
                 {
                     "type": "challenge_accept",
-                    "game_id": event["game_id"],
+                    "gameId": event["game_id"],
                 }
             )
         )
+
 
 class GameConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
@@ -48,49 +49,19 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_add(self.room_name, self.channel_name)
             await self.accept()
 
-    async def receive_json(self, content, **kwargs):
-        command = content.get("command", None)
-        if command == "move":
-            await self.send_move(content)
-        elif command == "promote":
-            await self.send_promotion(content)
-        elif command == "resign":
-            await self.send_resign(content)
-
     async def disconnect(self, code):
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
-    async def send_move(self, move):
-        await self.channel_layer.group_send(
-            self.room_name,
-            {
-                "type": "chess.move",
-                "player": move["player"],
-                "from": move["from"],
-                "to": move["to"],
-                "timestamp": move["timestamp"],
-            },
-        )
-
-    async def send_promotion(self, promotion):
-        await self.channel_layer.group_send(
-            self.room_name,
-            {
-                "type": "chess.promote",
-                "player": promotion["player"],
-                "square": promotion["square"],
-                "piece": promotion["piece"],
-                "timestamp": promotion["timestamp"],
-            },
-        )
-
-    async def send_resign(self, data):
-        pass
+    async def receive_json(self, content, **kwargs):
+        type = content.get("type", None)
+        if type:
+            content["type"] = f"chess.{type}"
+            await self.channel_layer.group_send(self.room_name, content)
 
     async def chess_move(self, event):
         await self.send_json(
             {
-                "msg_type": "move",
+                "type": "move",
                 "player": event["player"],
                 "from": event["from"],
                 "to": event["to"],
@@ -98,10 +69,10 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
             }
         )
 
-    async def chess_promote(self, event):
+    async def chess_promotion(self, event):
         await self.send_json(
             {
-                "msg_type": "promote",
+                "type": "promotion",
                 "player": event["player"],
                 "square": event["square"],
                 "piece": event["piece"],

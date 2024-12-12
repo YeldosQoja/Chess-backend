@@ -96,19 +96,21 @@ WSGI_APPLICATION = "core.wsgi.application"
 
 ASGI_APPLICATION = "core.asgi.application"
 
+REDIS_HOST = (
+    ("127.0.0.1", 6379)
+    if DEBUG
+    else {
+        "host": os.environ.get("REDIS_HOST"),
+        "port": os.environ.get("REDIS_PORT"),
+        "username": os.environ.get("REDIS_USERNAME"),
+        "password": os.environ.get("REDIS_PASSWORD"),
+    }
+)
+
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [
-                {
-                    "host": os.environ.get("REDIS_HOST"),
-                    "port": os.environ.get("REDIS_PORT"),
-                    "username": os.environ.get("REDIS_USERNAME"),
-                    "password": os.environ.get("REDIS_PASSWORD"),
-                }
-            ]
-        },
+        "CONFIG": {"hosts": [REDIS_HOST]},
     }
 }
 
@@ -186,4 +188,4 @@ STORAGES = {
 import dj_database_url
 
 if not DEBUG:
-    DATABASES['default'] = dj_database_url.config(conn_max_age=600, ssl_require=True)
+    DATABASES["default"] = dj_database_url.config(conn_max_age=600, ssl_require=True)

@@ -10,7 +10,7 @@ from rest_framework.decorators import (
     authentication_classes,
 )
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import User, Friendship, FriendRequest, Game, GameRequest, UserChannel
+from .models import User, Friendship, FriendRequest, Game, GameRequest
 from django.shortcuts import get_object_or_404
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -239,7 +239,12 @@ def send_challenge(request, username):
         )
     game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
     async_to_sync(channel_layer.group_send)(
-        username, {"type": "game.challenge", "request_id": game_request.pk}
+        username,
+        {
+            "type": "game.challenge",
+            "request_id": game_request.pk,
+            "username": request.user.username,
+        },
     )
     return Response(status=status.HTTP_201_CREATED)
 
