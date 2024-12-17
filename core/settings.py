@@ -31,7 +31,7 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DEBUG", "") != "False"
 
-ALLOWED_HOSTS = ["prime-chess-add31a4980ac.herokuapp.com", "127.0.0.1"]
+ALLOWED_HOSTS = ["prime-chess-add31a4980ac.herokuapp.com", "127.0.0.1", "10.0.2.2"]
 
 CSRF_TRUSTED_ORIGINS = ["https://prime-chess-add31a4980ac.herokuapp.com"]
 
