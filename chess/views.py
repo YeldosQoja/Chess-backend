@@ -175,6 +175,11 @@ def add_friend(request, pk):
     user = request.user
     friend = get_object_or_404(User, pk=pk)
     try:
+        if user == friend:
+            return Response(
+                {"message": "You can not send friend request to yourself."},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED,
+            )
         if friend in user.friends.all():
             return Response(
                 {"message": f"You and {friend} are already friends."},
