@@ -1,13 +1,11 @@
 from django.test import TestCase, RequestFactory
-from .views import user_signin, CreateUserView
-from .models import User, Friendship, FriendRequest, UserChannel, Game
-from .serializers import UserSerializer, GameSerializer
+from chess.views import user_signin, CreateUserView
+from chess.models import User, Friendship, FriendRequest, Game
+from chess.serializers import UserSerializer, GameSerializer
 from rest_framework.test import APIClient
 from django.urls import reverse
 from channels.testing import WebsocketCommunicator
-from .consumers import MainConsumer
-from core.asgi import application
-
+from chess.consumers import MainConsumer
 
 class AuthWebsocketCommunicator(WebsocketCommunicator):
     def __init__(self, application, path, headers=None, subprotocols=None, user=None):
