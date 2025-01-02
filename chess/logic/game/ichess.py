@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from typing import List
 from ..move import Move
-from ..typing import Square
+from ..typing import Square, PieceType
 from .board import Board
 from .ipiece import IPiece
 
@@ -21,7 +21,15 @@ class IChess(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def make_move(self, move: Move) -> None:
+    def make_move(self, move: Move, promotion: PieceType | None = None) -> str:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def is_move_valid(self, move: Move) -> bool:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def encode_move(self, move: Move, promotion: PieceType | None = None) -> str:
         raise NotImplementedError
 
     @abstractmethod
@@ -42,14 +50,6 @@ class IChess(metaclass=ABCMeta):
 
     @abstractmethod
     def set_piece(self, piece: Move, square: Square) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def is_square_empty(self, square: Square) -> None:
-        raise NotImplementedError
-
-    @abstractmethod
-    def is_valid_square(self, square: Square) -> bool:
         raise NotImplementedError
 
     @abstractmethod

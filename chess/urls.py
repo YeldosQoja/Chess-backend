@@ -1,24 +1,5 @@
 from django.urls import path
-from .views import (
-    home,
-    UserListView,
-    UserDetailView,
-    ProfileView,
-    ProfileFriendListView,
-    ProfileGameListView,
-    FriendListView,
-    FriendRequestListView,
-    user_games,
-    add_friend,
-    accept_friend,
-    decline_friend,
-    remove_friend,
-    GameRetrieveView,
-    finish_game,
-    send_challenge,
-    accept_challenge,
-    decline_challenge,
-)
+from .views import *
 
 urlpatterns = [
     path("home/", home, name="home"),
@@ -39,4 +20,5 @@ urlpatterns = [
     path("games/challenges/send/<str:username>/", send_challenge, name="game-challenge-send"),
     path("games/challenges/<int:pk>/accept/", accept_challenge, name="game-challenge-accept"),
     path("games/challenges/<int:pk>/decline/", decline_challenge, name="game-challenge-decline"),
+    path("games/<int:pk>/move/", make_move, name="game-move"),
 ]

@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate, login, logout
 from rest_framework import status, generics
 from rest_framework.exceptions import AuthenticationFailed
-from .serializers import UserSerializer, FriendRequestSerialier, GameSerializer
+from .serializers import *
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.decorators import (
@@ -10,11 +10,13 @@ from rest_framework.decorators import (
     authentication_classes,
 )
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import User, Friendship, FriendRequest, Game, GameRequest
+from .models import *
 from django.shortcuts import get_object_or_404
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db.models import Q
+from .logic.game.chess import Chess
+from .logic.move import Move as ChessMove
 
 
 # Create your views here.
@@ -236,13 +238,13 @@ channel_layer = get_channel_layer()
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def send_challenge(request, username):
-    opponent = get_object_or_404(User, username=username)
-    if opponent.profile.is_playing():
+    black = get_object_or_404(User, username=username)
+    if black.profile.is_playing():
         return Response(
-            {"message": f"{opponent} is already playing"},
+            {"message": f"{black} is already playing"},
             status=status.HTTP_404_NOT_FOUND,
         )
-    game_request = GameRequest.objects.create(sender=request.user, receiver=opponent)
+    game_request = GameRequest.objects.create(sender=request.user, receiver=black)
     async_to_sync(channel_layer.group_send)(
         username,
         {
@@ -258,12 +260,12 @@ def send_challenge(request, username):
 @permission_classes([IsAuthenticated])
 def accept_challenge(request, pk):
     game_request = get_object_or_404(GameRequest, pk=pk)
-    opponent = game_request.sender
+    white = game_request.sender
     # Invalidate game request
     game_request.accept()
-    game = Game.objects.create(challenger=opponent, opponent=request.user)
+    game = Game.objects.create(white=white, black=request.user)
     async_to_sync(channel_layer.group_send)(
-        opponent.username,
+        white.username,
         {"type": "challenge.accept", "game_id": game.pk},
     )
     return Response({"game_id": game.pk}, status=status.HTTP_201_CREATED)
@@ -283,29 +285,68 @@ class GameRetrieveView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return Game.objects.filter(
-            Q(challenger=self.request.user) | Q(opponent=self.request.user)
+            Q(white=self.request.user) | Q(black=self.request.user)
         )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def make_move(request, pk):
+    game = get_object_or_404(Game, pk=pk)
+    start_square = request.data.get("start_square", None)
+    end_square = request.data.get("end_square", None)
+    promotion = request.data.get("promotion", None)
+    timestamp = request.data.get("timestamp", None)
+    if not start_square or not end_square:
+        return Response(
+            {"message": "Invalid move squares"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    chess = Chess.from_repr(game.fen_notation)
+    chess_move = ChessMove(tuple(start_square), tuple(end_square))
+    if not chess.is_move_valid(chess_move):
+        return Response(
+            {"message": "The move is invalid"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    move_notation = chess.make_move(chess_move, promotion)
+    game.fen_notation = repr(chess)
+    game.save(update_fields=["fen_notation"])
+    start_y, start_x = start_square
+    end_y, end_x = end_square
+    player_color = game.get_color(request.user)
+    Move.objects.create(
+        game=game,
+        player=player_color[0],
+        notation=move_notation,
+        start_x=start_x,
+        start_y=start_y,
+        end_x=end_x,
+        end_y=end_y,
+    )
+
+    async_to_sync(channel_layer.group_send)(f"room-{game.pk}", {
+        "type": "chess.move",
+        "player": player_color,
+        "notation": move_notation,
+        "start_square": start_square,
+        "end_square": end_square,
+        "promotion": promotion,
+    })
+    return Response({ "notation": move_notation, "timestamp": timestamp }, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def finish_game(request, pk):
     winner_color = request.data.get("winner", None)
-    finished_at = request.data.get("finished_at", None)
-    if finished_at is None:
-        return Response(
-            {"message": "finished_at parameter is not provided!"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
 
     game = get_object_or_404(Game, pk=pk)
 
     winner = None
     if winner_color == "white":
-        winner = game.challenger
+        winner = game.white
     elif winner_color == "black":
-        winner = game.opponent
+        winner = game.black
 
-    game.finish(winner, finished_at)
+    game.finish(winner)
 
     return Response(status=status.HTTP_200_OK)

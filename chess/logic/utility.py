@@ -1,10 +1,13 @@
 from typing import List
 from .typing import Square, PieceType
+from .move import Move
 from .game.ipiece import IPiece
 from .game.piece import Piece
 from .game.board import Board
-from .strategies.strategy_factory import StrategyFactory
 
+def is_valid_square(square: Square) -> bool:
+    y, x = square
+    return 0 <= y < 8 and 0 <= x < 8
 
 def encode_square(square: Square) -> str:
     i, j = square
@@ -18,7 +21,7 @@ def decode_square(notation: str) -> Square:
     j = ord(file) - ord("a")
     return (i, j)
 
-def create_pieces_from_board(board_repr: str, strategy_factory: StrategyFactory) -> List[IPiece]:
+def create_pieces_from_board(board_repr: str, strategy_factory) -> List[IPiece]:
     pieces = []
     for i, row in enumerate(board_repr.split("/")):
         j = 0

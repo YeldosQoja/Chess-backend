@@ -66,13 +66,14 @@ class Profile(models.Model):
 
     def is_playing(self):
         return Game.objects.filter(
-            Q(challenger=self.user) | Q(opponent=self.user), is_active=True
+            Q(white=self.user) | Q(black=self.user), is_active=True
         ).exists()
 
     def games(self):
-        return Game.objects.filter(
-            Q(challenger=self.user) | Q(opponent=self.user), is_active=False
+        games = Game.objects.filter(
+            Q(white=self.user) | Q(black=self.user), is_active=False
         ).order_by("-finished_at")
+        return games
 
     def wins(self):
         user_games = self.games()
@@ -140,21 +141,29 @@ class FriendRequest(models.Model):
 
 
 class Game(models.Model):
-    challenger = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="challenger"
+    white = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="white"
     )
-    opponent = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="opponent"
+    black = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="black"
     )
     winner = models.IntegerField(null=True, default=None)
     is_active = models.BooleanField(default=True)
+    fen_notation = models.CharField(max_length=90, default="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -")
     created_at = models.DateTimeField(default=timezone.now)
     started_at = models.DateTimeField(null=True)
     finished_at = models.DateTimeField(null=True)
 
-    def finish(self, winner, finished_at):
+    def get_color(self, player: User) -> str:
+        if self.white == player:
+            return "white"
+        if self.black == player:
+            return "black"
+        return None
+
+    def finish(self, winner):
         self.is_active = False
-        self.finished_at = finished_at
+        self.finished_at = timezone.now()
         self.winner = winner.pk
         self.save()
 
@@ -180,11 +189,6 @@ class GameRequest(models.Model):
         self.save()
 
 
-class UserChannel(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-
-
 class ChatMembership(models.Model):
     member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="member")
     chat = models.ForeignKey("ChatRoom", on_delete=models.CASCADE, related_name="chat")
@@ -205,3 +209,21 @@ class ChatMessage(models.Model):
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, default=None)
+
+
+class Move(models.Model):
+    PLAYER_CHOICES = {
+        "w": "white",
+        "b": "black"
+    }
+    game = models.ForeignKey(Game, on_delete=models.CASCADE, related_name="moves")
+    player = models.CharField(max_length=1, choices=PLAYER_CHOICES)
+    notation = models.CharField(max_length=7)
+    start_x = models.PositiveSmallIntegerField()
+    start_y = models.PositiveSmallIntegerField()
+    end_x = models.PositiveSmallIntegerField()
+    end_y = models.PositiveSmallIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.notation

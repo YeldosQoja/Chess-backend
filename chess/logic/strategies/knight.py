@@ -1,4 +1,5 @@
 from ..typing import PieceType, KNIGHT_OFFSETS
+from ..utility import is_valid_square
 from .strategy import Strategy
 
 class KnightStrategy(Strategy):
@@ -11,7 +12,7 @@ class KnightStrategy(Strategy):
         moves = []
         for rank_offset, file_offset in KNIGHT_OFFSETS:
             square = (rank + rank_offset, file + file_offset)
-            if not self.is_valid_square(square):
+            if not is_valid_square(square):
                 continue
             enemy_piece = self.game.get_piece(square)
             if not enemy_piece or enemy_piece.color != piece.color:

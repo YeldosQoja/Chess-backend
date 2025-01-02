@@ -7,6 +7,8 @@ from ..utility import (
     create_board_repr,
     create_en_passant_target,
     find_en_passant_pawn,
+    is_valid_square,
+    encode_square,
 )
 
 
@@ -123,26 +125,85 @@ class Chess(IChess):
             self.pieces.append(Piece(color, (pawns_rank, i), pawn_strategy))
             self.pieces.append(Piece(color, (pieces_rank, i), strategy))
 
-    def make_move(self, move):
+    def make_move(self, move, promotion=None) -> str:
+        if self.is_move_valid(move):
+            encoded_move = self.encode_move(move, promotion)
+            piece = self.get_piece(move.start_square)
+            self.current_en_passant_pawn = None
+            piece.move_to(move.end_square)
+            if promotion:
+                strategy = StrategyFactory(self).create(promotion)
+                piece.update_strategy(strategy)
+            self.switch_turn()
+            sign = ""
+            if self.is_in_checkmate():
+                sign = "#"
+            elif self.is_in_check():
+                sign = "+"
+            # Returns an algebraic notation of a given move
+            return encoded_move + sign
+        return ""
+
+    def is_move_valid(self, move):
         start_square = move.start_square
         end_square = move.end_square
-        piece = self.get_piece(start_square)
-        if (
-            piece
-            and piece.color == self.active_color
-            and piece.is_move_valid(end_square)
-        ):
-            self.current_en_passant_pawn = None
-            piece.move_to(end_square)
-            if not piece.should_get_promoted():
-                self.switch_turn()
+        start_piece = self.get_piece(start_square)
+        end_piece = self.get_piece(end_square)
+        if not start_piece or start_piece.color != self.active_color:
+            return False
+        if not is_valid_square(end_square):
+            return False
+        if end_piece and start_piece.color == end_piece.color:
+            return False
+        return start_piece.is_move_valid(end_square)
+
+    def encode_move(self, move, promotion=None) -> str:
+        if not self.is_move_valid(move):
+            return ""
+
+        start_piece = self.get_piece(move.start_square)
+        end_piece = self.get_piece(move.end_square)
+
+        piece_name = (
+            start_piece.type.upper() if start_piece.type != PieceType.PAWN else ""
+        )
+        has_captured = "x" if end_piece else ""
+        square_notation = encode_square(move.end_square)
+        # Find the same piece who also can move to the same square
+        same_piece = next(
+            (
+                piece
+                for piece in self.pieces
+                if not piece.is_captured
+                and piece.color == start_piece.color
+                and piece.type == start_piece.type
+                and piece.is_move_valid(move.end_square)
+            ),
+            None,
+        )
+        coordinate = ""
+        if same_piece:
+            start_y, start_x = move.start_square
+            y, x = same_piece.current_square
+            coordinate = start_y if start_x == x else start_x
+        promotion_piece_name = promotion.upper() if promotion else ""
+
+        return "".join(
+            [
+                piece_name,
+                has_captured,
+                str(coordinate),
+                square_notation,
+                promotion_piece_name,
+            ]
+        )
 
     def switch_turn(self):
         self.active_color = "black" if self.active_color == "white" else "white"
 
     def get_piece(self, square):
         rank, file = square
-        if not self.is_valid_square(square):
+        if not is_valid_square(square):
             return None
         return self.board[rank][file]
 
@@ -159,17 +220,10 @@ class Chess(IChess):
         return self.get_piece(square)
 
     def set_piece(self, piece, square):
-        if not self.is_valid_square(piece):
+        if not is_valid_square(piece):
             return IndexError()
         rank, file = square
         self.board[rank][file] = piece
-
-    def is_square_empty(self, square):
-        return not self.is_valid_square(square) or not self.get_piece(square)
-
-    def is_valid_square(self, square):
-        rank, file = square
-        return 0 <= rank < 8 and 0 <= file < 8
 
     def is_square_threatened(self, square, color):
         for rank in range(8):

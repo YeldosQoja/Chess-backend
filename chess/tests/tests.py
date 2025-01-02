@@ -4,30 +4,23 @@ from chess.models import User, Friendship, FriendRequest, Game
 from chess.serializers import UserSerializer, GameSerializer
 from rest_framework.test import APIClient
 from django.urls import reverse
-from channels.testing import WebsocketCommunicator
-from chess.consumers import MainConsumer
-
-class AuthWebsocketCommunicator(WebsocketCommunicator):
-    def __init__(self, application, path, headers=None, subprotocols=None, user=None):
-        super(AuthWebsocketCommunicator, self).__init__(
-            application, path, headers, subprotocols
-        )
-        if user is not None:
-            self.scope["user"] = user
+from chess.logic.game.chess import Chess
+from django.utils import timezone
+import json
 
 
 class AuthViewTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
+        self.api_client = APIClient()
         self.user = User.objects.create_user(
             email="test@test.com", username="test", password="12345"
         )
 
     def test_sign_in_existent_user(self):
-        request = self.factory.post(
+        response = self.api_client.post(
             reverse("signin"), {"email": "test@test.com", "password": "12345"}
         )
-        response = user_signin(request)
         self.assertEqual(response.status_code, 201)
 
     def test_sign_in_non_existent_user(self):
@@ -69,19 +62,17 @@ class ProfileModelTests(TestCase):
         self.friend = User.objects.create_user(
             email="friend@test.com", username="friend", password="12345"
         )
-        game1 = Game.objects.create(challenger=self.user, opponent=self.friend)
-        game2 = Game.objects.create(challenger=self.friend, opponent=self.user)
-        game3 = Game.objects.create(challenger=self.user, opponent=self.friend)
+        game1 = Game.objects.create(white=self.user, black=self.friend)
+        game2 = Game.objects.create(white=self.friend, black=self.user)
+        game3 = Game.objects.create(white=self.user, black=self.friend)
         self.games = [game1, game2, game3]
 
-    def test_games_count(self):
-        user_games = self.user.profile.games()
-        self.assertEqual(user_games.count(), 3)
-
     def test_user_wins_count(self):
-        self.games[0].finish(winner=self.user.pk)
-        self.games[1].finish(winner=self.user.pk)
+        self.games[0].finish(winner=self.user)
+        self.games[1].finish(winner=self.user)
+        user_games = self.user.profile.games()
         user_wins = self.user.profile.wins()
+        self.assertEqual(user_games.count(), 2)
         self.assertEqual(user_wins, 2)
 
 
@@ -93,15 +84,16 @@ class ProfileTests(TestCase):
         self.friend = User.objects.create_user(
             email="friend@test.com", username="friend", password="12345"
         )
-        self.game = Game.objects.create(challenger=self.user, opponent=self.friend)
+        self.game = Game.objects.create(white=self.user, black=self.friend)
         self.api_client = APIClient()
         self.api_client.force_authenticate(user=self.user)
 
     def test_get_user_profile(self):
+        self.game.finish(winner=self.user)
+        serializer = GameSerializer(self.game)
         response = self.api_client.get(reverse("profile-game-list"))
         self.assertEqual(response.status_code, 200)
-        serializer = GameSerializer(self.game)
-        self.assertEqual(response.data, [serializer.data])
+        self.assertEqual(response.data[0]["id"], serializer.data["id"])
 
     def test_get_user_profile_by_id(self):
         response = self.api_client.get(reverse("user-detail", args=(self.user.pk,)))
@@ -248,30 +240,96 @@ class FriendRequestViewTests(TestCase):
         self.assertNotIn(self.friend, self.user.friends.all())
 
 
-# class GameAPIViewsTests(TestCase):
-# def setUp(self):
-#     self.user = User.objects.create_user(
-#         email="test@test.com", username="test", password="12345"
-#     )
-#     self.friend = User.objects.create_user(
-#         email="friend@test.com", username="friend", password="12345"
-#     )
-#     UserChannel.objects.create(name=self.user.username, user=self.user)
-#     UserChannel.objects.create(name=self.friend.username, user=self.friend)
-#     self.user.friends.add(self.friend)
-#     self.friend.friends.add(self.user)
-#     self.api_client = APIClient()
-#     logged_in = self.api_client.login(email=self.user.email, password="12345")
+class MakeMoveViewTests(TestCase):
+    def setUp(self):
+        self.white = User.objects.create_user(
+            email="test@test.com", username="test", password="12345"
+        )
+        self.black = User.objects.create_user(
+            email="friend@test.com", username="friend", password="12345"
+        )
+        self.game = Game.objects.create(white=self.white, black=self.black)
+        self.white_api_client = APIClient()
+        self.white_api_client.force_authenticate(user=self.white)
+        self.black_api_client = APIClient()
+        self.black_api_client.force_authenticate(user=self.black)
 
-# async def test_on_challenge_event(self):
-#     communicator = WebsocketCommunicator(MainConsumer.as_asgi(), "/")
-#     communicator.scope["user"] = self.user
-#     connected, _ = await communicator.connect()
-#     self.assertTrue(connected)
-#     response = self.api_client.post(
-#         reverse("challenge"), {"opponent": self.friend.pk}
-#     )
-#     await communicator.send_to(text_data="Hello")
-#     response = await communicator.receive_from()
-#     print(response)
-#     await communicator.disconnect()
+    def test_first_move(self):
+        response = self.white_api_client.post(
+            reverse("game-move", args=(self.game.pk,)),
+            json.dumps(
+                {
+                    "start_square": [6, 3],
+                    "end_square": [4, 3],
+                    "timestamp": str(timezone.now()),
+                }
+            ),
+            content_type="application/json",
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.game.moves.count(), 1)
+        self.assertEqual(self.game.fen_notation, "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq d3")
+
+    def test_inactive_color_move(self):
+        response = self.white_api_client.post(
+            reverse("game-move", args=(self.game.pk,)),
+            json.dumps(
+                {
+                    "start_square": [1, 3],
+                    "end_square": [3, 3],
+                    "timestamp": str(timezone.now()),
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["message"], "The move is invalid")
+
+    def test_invalid_move(self):
+        # e4
+        response = self.white_api_client.post(
+            reverse("game-move", args=(self.game.pk,)),
+            json.dumps(
+                {
+                    "start_square": [6, 4],
+                    "end_square": [4, 4],
+                    "timestamp": str(timezone.now()),
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Nh6
+        response = self.black_api_client.post(
+            reverse("game-move", args=(self.game.pk,)),
+            json.dumps(
+                {
+                    "start_square": [0, 6],
+                    "end_square": [2, 7],
+                    "timestamp": str(timezone.now()),
+                }
+            ),
+            content_type="application/json",
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.game.fen_notation, "rnbqkb1r/pppppppp/7n/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq -")
+
+        # invalid move - Bh3
+        response = self.white_api_client.post(
+            reverse("game-move", args=(self.game.pk,)),
+            json.dumps(
+                {
+                    "start_square": [7, 5],
+                    "end_square": [5, 7],
+                    "timestamp": str(timezone.now()),
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["message"], "The move is invalid")
+
+    

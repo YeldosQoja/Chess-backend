@@ -1,5 +1,6 @@
 from typing import List
 from ..typing import *
+from ..utility import is_valid_square
 from ..game.ipiece import IPiece
 from .strategy import Strategy
 
@@ -14,7 +15,7 @@ class KingStrategy(Strategy):
         moves = []
         for rank_offset, file_offset in HORIZONTAL_VERTICAL_OFFSETS + DIAGONAL_OFFSETS:
             square = (rank + rank_offset, file + file_offset)
-            if not self.is_valid_square(square):
+            if not is_valid_square(square):
                 continue
             enemy_piece = self.game.get_piece(square)
             if not enemy_piece or enemy_piece.color != piece.color:
@@ -24,14 +25,11 @@ class KingStrategy(Strategy):
     def get_valid_moves(self, piece_square):
         rank, file = piece_square
         piece = self.game.get_piece(piece_square)
-
         moves = super().get_valid_moves(piece_square)
-
         if self.is_king_side_castle_valid(piece):
             moves.append((rank, 6))
         if self.is_queen_side_castle_valid(piece):
             moves.append((rank, 2))
-
         return moves
 
     def make_move(self, move):

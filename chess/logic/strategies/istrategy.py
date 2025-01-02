@@ -19,11 +19,3 @@ class IStrategy(metaclass=ABCMeta):
     @abstractmethod
     def make_move(self, move: Move) -> None:
         raise NotImplementedError
-
-    @abstractmethod
-    def is_valid_square(self, square: Square) -> bool:
-        raise NotImplementedError
-
-    @abstractmethod
-    def should_get_promoted(self, piece_square: Square) -> bool:
-        raise NotImplementedError

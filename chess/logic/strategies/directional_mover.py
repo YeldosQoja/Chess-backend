@@ -1,4 +1,5 @@
 from typing import List, Tuple
+from ..utility import is_valid_square
 from .strategy import Strategy
 
 class DirectionalMoverStrategy(Strategy):
@@ -13,7 +14,7 @@ class DirectionalMoverStrategy(Strategy):
         for rank_offset, file_offset in self.movement_offsets:
             curr_rank, curr_file = (rank + rank_offset, file + file_offset)
             square = (curr_rank, curr_file)
-            while self.is_valid_square(square):
+            while is_valid_square(square):
                 enemy_piece = self.game.get_piece(square)
                 if enemy_piece and piece.color == enemy_piece.color:
                     break

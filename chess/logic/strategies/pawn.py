@@ -1,4 +1,5 @@
 from ..typing import PieceType
+from ..utility import is_valid_square
 from .strategy import Strategy
 
 class PawnStrategy(Strategy):
@@ -9,12 +10,11 @@ class PawnStrategy(Strategy):
         piece = self.game.get_piece(piece_square)
         rank, file = piece_square
         rank_offset = -1 if piece.color == "white" else 1
-        
         moves = []
 
         # if there is no piece in front of pawn
         square = (rank + rank_offset, file)
-        if self.is_valid_square(square) and not self.game.get_piece(square):
+        if is_valid_square(square) and not self.game.get_piece(square):
             moves.append(square)
             # if pawn has not moved yet
             square = (rank + rank_offset * 2, file)
@@ -38,7 +38,6 @@ class PawnStrategy(Strategy):
                 and self.game.current_en_passant_pawn == enemy_piece
             ):
                 moves.append((rank + rank_offset, file + file_offset))
-
         return moves
     
     def make_move(self, move):
@@ -55,9 +54,3 @@ class PawnStrategy(Strategy):
                 self.game.current_en_passant_pawn.is_captured = True
         
         super().make_move(move)
-        
-    def should_get_promoted(self, piece_square):
-        piece = self.game.get_piece(piece_square)
-        rank, _ = piece_square
-        promotion_rank = 0 if piece.color == "white" else 7
-        return rank == promotion_rank

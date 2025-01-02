@@ -3,6 +3,7 @@ from channels.generic.websocket import (
     AsyncWebsocketConsumer,
     AsyncJsonWebsocketConsumer,
 )
+from .models import Game
 
 class MainConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -47,41 +48,26 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         else:
             self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
             await self.channel_layer.group_add(self.room_name, self.channel_name)
+            _, game_id = self.room_name.split("-")
+            game = Game.objects.get(pk=game_id)
+            self.color = game.get_color(self.scope["user"])
             await self.accept()
 
     async def disconnect(self, code):
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
 
-    async def receive_json(self, content, **kwargs):
-        type = content.get("type", None)
-        if type:
-            content["type"] = f"chess.{type}"
-            await self.channel_layer.group_send(self.room_name, content)
-
     async def chess_move(self, event):
-        await self.send_json(
-            {
-                "type": "move",
-                "player": event["player"],
-                "from": event["from"],
-                "to": event["to"],
-                "timestamp": event["timestamp"],
-            }
-        )
-
-    async def chess_promotion(self, event):
-        await self.send_json(
-            {
-                "type": "promotion",
-                "player": event["player"],
-                "square": event["square"],
-                "piece": event["piece"],
-                "timestamp": event["timestamp"],
-            }
-        )
+        if self.color != event["player"]:
+            await self.send_json(
+                {
+                    "type": "move",
+                    "player": event["player"],
+                    "start_square": event["start_square"],
+                    "end_square": event["end_square"],
+                    "promotion": event["promotion"],
+                }
+            )
 
     async def chess_resign(self, event):
         pass
 
-    async def chess_win(self, event):
-        pass

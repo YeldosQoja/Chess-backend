@@ -30,6 +30,10 @@ class IPiece(metaclass=ABCMeta):
     @abstractmethod
     def is_move_valid(self, square: Square) -> bool:
         raise NotImplementedError
+    
+    @abstractmethod
+    def is_move_pseudo_valid(self, square: Square) -> bool:
+        raise NotImplementedError
 
     @abstractmethod
     def should_get_promoted(self) -> bool:
