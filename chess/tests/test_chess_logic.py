@@ -121,3 +121,45 @@ class ChessLogicTests(TestCase):
         game.make_move(Move((3, 4), (2, 3)))
         self.assertEqual("rnbqkbnr/p1p1pppp/1p1P4/8/8/8/PPPP1PPP/RNBQKBNR b KQkq -", repr(game))
 
+    def test_move_algebraic_notation(self):
+        game: IChess = Chess()
+        move_notation = game.make_move(Move((6, 6), (5, 6)))
+        self.assertEqual(move_notation, "g3")
+        self.assertEqual(repr(game), "rnbqkbnr/pppppppp/8/8/8/6P1/PPPPPP1P/RNBQKBNR b KQkq -")
+
+        move_notation = game.make_move(Move((1, 4), (3, 4)))
+        self.assertEqual(move_notation, "e5")
+        self.assertEqual(repr(game), "rnbqkbnr/pppp1ppp/8/4p3/8/6P1/PPPPPP1P/RNBQKBNR w KQkq e6")
+
+        move_notation = game.make_move(Move((7, 5), (5, 7)))
+        self.assertEqual(move_notation, "Bh3")
+        self.assertEqual(repr(game), "rnbqkbnr/pppp1ppp/8/4p3/8/6PB/PPPPPP1P/RNBQK1NR b KQkq -")
+
+        move_notation = game.make_move(Move((0, 3), (4, 7)))
+        self.assertEqual(move_notation, "Qh4")
+        self.assertEqual(repr(game), "rnb1kbnr/pppp1ppp/8/4p3/7q/6PB/PPPPPP1P/RNBQK1NR w KQkq -")
+
+        move_notation = game.make_move(Move((5, 6), (4, 7)))
+        self.assertEqual(move_notation, "xh4")
+        self.assertEqual(repr(game), "rnb1kbnr/pppp1ppp/8/4p3/7P/7B/PPPPPP1P/RNBQK1NR b KQkq -")
+    
+    def test_special_cases_in_algebraic_notation(self):
+        game = Chess.from_repr("r1bqkbnr/1ppp1ppp/p1B5/4p3/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq -")
+        move_notation = game.make_move(Move((1, 3), (2, 2)))
+        self.assertEqual(move_notation, "dxc6")
+        self.assertEqual(repr(game), "r1bqkbnr/1pp2ppp/p1p5/4p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq -")
+
+        game = Chess.from_repr("rnbqkbnr/pp2pppp/3p4/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq -")
+        move_notation = game.make_move(Move((7, 5), (3, 1)))
+        self.assertEqual(move_notation, "Bb5+")
+        self.assertEqual(repr(game), "rnbqkbnr/pp2pppp/3p4/1Bp5/4P3/5N2/PPPP1PPP/RNBQK2R b KQkq -")
+
+        game = Chess.from_repr("r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/3P1N2/PPP2PPP/RNBQK2R w KQkq -")
+        move_notation = game.make_move(Move((7, 1), (6, 3)))
+        self.assertEqual(move_notation, "Nbd2")
+        self.assertEqual(repr(game), "r1bqk2r/1pppbppp/p1n2n2/4p3/B3P3/3P1N2/PPPN1PPP/R1BQK2R b KQkq -")
+
+        game = Chess.from_repr("2rq1rk1/1b2bppp/p2p1n2/npp1p3/4P3/1BPP1N2/PP3PPP/R1BQRNK1 w - -")
+        move_notation = game.make_move(Move((7, 5), (6, 3)))
+        self.assertEqual(move_notation, "N1d2")
+        self.assertEqual(repr(game), "2rq1rk1/1b2bppp/p2p1n2/npp1p3/4P3/1BPP1N2/PP1N1PPP/R1BQR1K1 b - -")

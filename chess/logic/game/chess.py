@@ -175,6 +175,7 @@ class Chess(IChess):
                 piece
                 for piece in self.pieces
                 if not piece.is_captured
+                and piece != start_piece
                 and piece.color == start_piece.color
                 and piece.type == start_piece.type
                 and piece.is_move_valid(move.end_square)
@@ -185,14 +186,14 @@ class Chess(IChess):
         if same_piece:
             start_y, start_x = move.start_square
             y, x = same_piece.current_square
-            coordinate = start_y if start_x == x else start_x
+            coordinate = str(8 - start_y) if start_x == x else chr(ord("a") + start_x)
         promotion_piece_name = promotion.upper() if promotion else ""
 
         return "".join(
             [
                 piece_name,
-                has_captured,
                 str(coordinate),
+                has_captured,
                 square_notation,
                 promotion_piece_name,
             ]
