@@ -3,7 +3,9 @@ from channels.generic.websocket import (
     AsyncWebsocketConsumer,
     AsyncJsonWebsocketConsumer,
 )
+from channels.db import database_sync_to_async
 from .models import Game
+
 
 class MainConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -48,10 +50,17 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
         else:
             self.room_name = self.scope["url_route"]["kwargs"]["room_name"]
             await self.channel_layer.group_add(self.room_name, self.channel_name)
-            _, game_id = self.room_name.split("-")
-            game = Game.objects.get(pk=game_id)
-            self.color = game.get_color(self.scope["user"])
+            game = await self.get_game()
+            self.color = await database_sync_to_async(game.get_color)(
+                self.scope["user"]
+            )
             await self.accept()
+
+    @database_sync_to_async
+    def get_game(self):
+        room_name = self.scope["url_route"]["kwargs"]["room_name"]
+        _, game_id = room_name.split("-")
+        return Game.objects.get(pk=game_id)
 
     async def disconnect(self, code):
         await self.channel_layer.group_discard(self.room_name, self.channel_name)
@@ -62,12 +71,11 @@ class GameConsumer(AsyncJsonWebsocketConsumer):
                 {
                     "type": "move",
                     "player": event["player"],
-                    "start_square": event["start_square"],
-                    "end_square": event["end_square"],
+                    "from": event["from"],
+                    "to": event["to"],
                     "promotion": event["promotion"],
                 }
             )
 
     async def chess_resign(self, event):
         pass
-

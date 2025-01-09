@@ -17,6 +17,7 @@ from channels.layers import get_channel_layer
 from django.db.models import Q
 from .logic.game.chess import Chess
 from .logic.move import Move as ChessMove
+from .logic.utility import decode_square
 
 
 # Create your views here.
@@ -289,12 +290,42 @@ class GameRetrieveView(generics.RetrieveAPIView):
         )
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_valid_moves(request, pk, square):
+    game = get_object_or_404(Game, pk=pk)
+    if not square:
+        return Response(
+            {"message": "Invalid start square"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    chess = Chess.from_repr(game.fen_notation)
+    piece = chess.get_piece(decode_square(square))
+    valid_moves = piece.get_valid_moves()
+    return Response(valid_moves, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def validate_move(request, pk):
+    game = get_object_or_404(Game, pk=pk)
+    start_square = request.data.get("from", None)
+    end_square = request.data.get("to", None)
+    if not start_square or not end_square:
+        return Response(
+            {"message": "Invalid move squares"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    chess = Chess.from_repr(game.fen_notation)
+    chess_move = ChessMove(tuple(start_square), tuple(end_square))
+    is_move_valid = chess.is_move_valid(chess_move)
+    return Response({"is_valid": is_move_valid}, status=status.HTTP_200_OK)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def make_move(request, pk):
     game = get_object_or_404(Game, pk=pk)
-    start_square = request.data.get("start_square", None)
-    end_square = request.data.get("end_square", None)
+    start_square = request.data.get("from", None)
+    end_square = request.data.get("to", None)
     promotion = request.data.get("promotion", None)
     timestamp = request.data.get("timestamp", None)
     if not start_square or not end_square:
@@ -323,15 +354,20 @@ def make_move(request, pk):
         end_y=end_y,
     )
 
-    async_to_sync(channel_layer.group_send)(f"room-{game.pk}", {
-        "type": "chess.move",
-        "player": player_color,
-        "notation": move_notation,
-        "start_square": start_square,
-        "end_square": end_square,
-        "promotion": promotion,
-    })
-    return Response({ "notation": move_notation, "timestamp": timestamp }, status=status.HTTP_200_OK)
+    async_to_sync(channel_layer.group_send)(
+        f"room-{game.pk}",
+        {
+            "type": "chess.move",
+            "player": player_color,
+            "notation": move_notation,
+            "from": start_square,
+            "to": end_square,
+            "promotion": promotion,
+        },
+    )
+    return Response(
+        {"notation": move_notation, "timestamp": timestamp}, status=status.HTTP_200_OK
+    )
 
 
 @api_view(["POST"])

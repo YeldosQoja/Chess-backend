@@ -20,5 +20,7 @@ urlpatterns = [
     path("games/challenges/send/<str:username>/", send_challenge, name="game-challenge-send"),
     path("games/challenges/<int:pk>/accept/", accept_challenge, name="game-challenge-accept"),
     path("games/challenges/<int:pk>/decline/", decline_challenge, name="game-challenge-decline"),
-    path("games/<int:pk>/move/", make_move, name="game-move"),
+    path("games/<int:pk>/move/make/", make_move, name="game-move"),
+    path("games/<int:pk>/move/validate/", validate_move, name="game-move-validate"),
+    path("games/<int:pk>/valid_moves/<str:square>/", get_valid_moves, name="game-valid-moves"),
 ]

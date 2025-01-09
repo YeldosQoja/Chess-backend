@@ -34,3 +34,6 @@ class Piece(IPiece):
     
     def should_get_promoted(self):
         return self.strategy.should_get_promoted(self.current_square)
+    
+    def __str__(self):
+        return f"{self.color} {self.type} at {self.current_square}"
