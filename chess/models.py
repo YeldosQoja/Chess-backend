@@ -77,11 +77,11 @@ class Profile(models.Model):
 
     def wins(self):
         user_games = self.games()
-        return user_games.filter(winner=self.user.pk).count()
+        return user_games.filter(winner=self.user).count()
 
     def losses(self):
         user_games = self.games()
-        return user_games.exclude(winner=self.user.pk).count()
+        return user_games.exclude(winner=self.user).count()
 
     def draws(self):
         user_games = self.games()
@@ -147,7 +147,7 @@ class Game(models.Model):
     black = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="black"
     )
-    winner = models.IntegerField(null=True, default=None)
+    winner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, default=None)
     is_active = models.BooleanField(default=True)
     fen_notation = models.CharField(max_length=90, default="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -")
     created_at = models.DateTimeField(default=timezone.now)
@@ -164,7 +164,7 @@ class Game(models.Model):
     def finish(self, winner):
         self.is_active = False
         self.finished_at = timezone.now()
-        self.winner = winner.pk
+        self.winner = winner
         self.save()
 
 
