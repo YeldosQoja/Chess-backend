@@ -45,12 +45,15 @@ class PawnStrategy(Strategy):
         start_rank, start_file = move.start_square
         end_rank, end_file = move.end_square
 
+        # Check if pawn is moving two squares
         if not piece.is_moved and abs(end_rank - start_rank) == 2:
             self.game.current_en_passant_pawn = piece
-        elif self.game.current_en_passant_pawn and self.game.current_en_passant_pawn.color != piece.color:
-            i, j = self.game.current_en_passant_pawn.current_square
-            en_passant_target_square = (i + (-1 if piece.color == "white" else 1), j)
-            if move.end_square == en_passant_target_square:
-                self.game.current_en_passant_pawn.is_captured = True
+        
+        # Check if pawn is capturing en passant
+        if start_file != end_file and not self.game.get_piece(move.end_square):
+            enemy_square = (start_rank, end_file)
+            enemy_piece = self.game.get_piece(enemy_square)
+            if enemy_piece:
+                enemy_piece.is_captured = True
         
         super().make_move(move)
