@@ -8,9 +8,9 @@ class IStrategy(metaclass=ABCMeta):
     def get_pseudo_valid_moves(self, piece_square: Square) -> List[Square]:
         raise NotImplementedError
 
-    @abstractmethod
-    def is_move_legal(self, start_square: Square, end_square: Square) -> bool:
-        raise NotImplementedError
+    # @abstractmethod
+    # def is_move_legal(self, start_square: Square, end_square: Square) -> bool:
+    #     raise NotImplementedError
     
     @abstractmethod
     def get_valid_moves(self, piece_square: Square) -> bool:
