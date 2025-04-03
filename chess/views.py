@@ -346,7 +346,7 @@ def make_move(request, pk):
     player_color = game.get_color(request.user)
     Move.objects.create(
         game=game,
-        player=player_color[0],
+        player=player_color,
         notation=move_notation,
         start_x=start_x,
         start_y=start_y,
@@ -366,7 +366,11 @@ def make_move(request, pk):
         },
     )
     return Response(
-        {"notation": move_notation, "timestamp": timestamp}, status=status.HTTP_200_OK
+        {
+            "notation": move_notation,
+            "timestamp": timestamp,
+        },
+        status=status.HTTP_200_OK,
     )
 
 
@@ -378,9 +382,9 @@ def finish_game(request, pk):
     game = get_object_or_404(Game, pk=pk)
 
     winner = None
-    if winner_color == "white":
+    if winner_color == "w":
         winner = game.white
-    elif winner_color == "black":
+    elif winner_color == "b":
         winner = game.black
 
     game.finish(winner)

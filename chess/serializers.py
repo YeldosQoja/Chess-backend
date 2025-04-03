@@ -78,14 +78,11 @@ class GameSerializer(serializers.ModelSerializer):
             winner = instance.get_color(instance.winner)
             white_serializer = UserSerializer(instance.white, context={ "request": request })
             black_serializer = UserSerializer(instance.black, context={ "request": request })
-            board, turn = instance.fen_notation.split(" ")[0:2]
 
             ret["color"] = color
             ret["winner"] = winner
             ret["white"] = white_serializer.data
             ret["black"] = black_serializer.data
-            ret["board"] = board
-            ret["turn"] = turn
         return ret
 
 

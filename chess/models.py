@@ -156,9 +156,9 @@ class Game(models.Model):
 
     def get_color(self, player: User) -> str:
         if self.white == player:
-            return "white"
+            return "w"
         if self.black == player:
-            return "black"
+            return "b"
         return None
 
     def finish(self, winner):
