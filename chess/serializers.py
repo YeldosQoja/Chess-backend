@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
-from .models import Profile, FriendRequest, Game, ChatRoom, ChatMessage
+from .models import Profile, FriendRequest, Game, ChatRoom, ChatMessage, Move
 
 
 User = get_user_model()
@@ -55,15 +55,38 @@ class FriendRequestSerialier(serializers.ModelSerializer):
         extra_kwargs = {"is_active": {"read_only": True}}
 
 
+class MoveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Move
+        fields = [
+            "player",
+            "notation",
+            "start_x",
+            "start_y",
+            "end_x",
+            "end_y",
+            "created_at",
+        ]
+
+
 class GameSerializer(serializers.ModelSerializer):
+    white = UserSerializer()
+    black = UserSerializer()
+    winner = UserSerializer()
+    moves = MoveSerializer(many=True)
+
     class Meta:
         model = Game
         fields = [
             "id",
+            "white",
+            "black",
+            "winner",
             "is_active",
             "created_at",
             "started_at",
             "finished_at",
+            "moves",
         ]
 
     def to_representation(self, instance):
@@ -73,21 +96,16 @@ class GameSerializer(serializers.ModelSerializer):
             user = self.context.get("user", None)
             if user is None:
                 user = request.user
-        
-            color = instance.get_color(user)
-            winner = instance.get_color(instance.winner)
-            white_serializer = UserSerializer(instance.white, context={ "request": request })
-            black_serializer = UserSerializer(instance.black, context={ "request": request })
 
+            color = instance.get_color(user)
             ret["color"] = color
-            ret["winner"] = winner
-            ret["white"] = white_serializer.data
-            ret["black"] = black_serializer.data
+
         return ret
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+
     class Meta:
         model = ChatMessage
         fields = ["id", "room", "sender", "content", "created_at", "edited_at"]
@@ -95,6 +113,7 @@ class ChatMessageSerializer(serializers.ModelSerializer):
 
 class ChatRoomSerializer(serializers.ModelSerializer):
     members = UserSerializer(many=True, read_only=True)
+
     class Meta:
         model = ChatRoom
         fields = ["id", "members", "created_at", "updated_at"]
